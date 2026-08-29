@@ -1,0 +1,47 @@
+{
+  "name": "sellpilot-server",
+  "version": "1.0.0",
+  "description": "Backend API for SellPilot AI — Razorpay Track 01 (AI Growth & Agentic Commerce)",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "rimraf dist && tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --detectOpenHandles --forceExit"
+  },
+  "keywords": [
+    "sellpilot",
+    "agentic-commerce",
+    "razorpay",
+    "express",
+    "typescript",
+    "mongoose"
+  ],
+  "author": "SellPilot Team",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.2",
+    "razorpay": "^2.9.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.14",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.10",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4"
+  }
+}

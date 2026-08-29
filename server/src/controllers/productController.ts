@@ -1,0 +1,126 @@
+import { Request, Response, NextFunction } from 'express';
+import { ProductService } from '../services/productService';
+import { AuthRequest } from '../middleware/auth';
+import { CustomError } from '../middleware/errorHandler';
+
+export class ProductController {
+  public static async getProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { category, minPrice, maxPrice, search, available, merchantId } = req.query;
+
+      const products = await ProductService.getProducts({
+        category: category as string,
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        search: search as string,
+        available: available === 'true',
+        merchantId: merchantId as string,
+      });
+
+      res.status(200).json({
+        success: true,
+        count: products.length,
+        products,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async getProductById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const product = await ProductService.getProductById(id);
+
+      res.status(200).json({
+        success: true,
+        product,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async createProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const merchantId = req.user?.merchantId || req.user?.userId;
+      const { name, description, category, price, currency, stock, sku, features, tags, relatedProducts } = req.body;
+
+      const product = await ProductService.createProduct({
+        merchantId,
+        name,
+        description,
+        category,
+        price,
+        currency,
+        stock,
+        sku,
+        features,
+        tags,
+        relatedProducts,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Product created successfully',
+        product,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async updateProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const merchantId = req.user?.merchantId || req.user?.userId;
+      if (!merchantId) {
+        throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
+      }
+
+      const updated = await ProductService.updateProduct(id, merchantId, req.body);
+
+      res.status(200).json({
+        success: true,
+        message: 'Product updated successfully',
+        product: updated,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async deleteProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const merchantId = req.user?.merchantId || req.user?.userId;
+      if (!merchantId) {
+        throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
+      }
+
+      await ProductService.deleteProduct(id, merchantId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Product deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async getAICatalog(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { merchantId } = req.query;
+      const products = await ProductService.getAICatalog(merchantId as string);
+
+      res.status(200).json({
+        success: true,
+        count: products.length,
+        products,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}

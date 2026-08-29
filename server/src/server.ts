@@ -1,0 +1,25 @@
+import app from './app';
+import { connectDB } from './config/db';
+import { config } from './config/env';
+
+const startServer = async () => {
+  try {
+    // Connect Database
+    await connectDB();
+
+    // Start Express Listener
+    app.listen(config.port, () => {
+      console.log(`[SellPilot Server] Running in ${config.nodeEnv} mode on port ${config.port}`);
+      console.log(`[SellPilot Server] Health Check: http://localhost:${config.port}/api/health`);
+    });
+  } catch (error) {
+    console.error('[SellPilot Server] Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+export default app;
