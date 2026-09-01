@@ -1,4 +1,13 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const getApiBase = (): string => {
+  if (typeof window !== 'undefined') {
+    if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('undefined')) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    const hostname = window.location.hostname || 'localhost';
+    return `http://${hostname}:5000`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+};
 
 export type ApiResponse<T = Record<string, any>> = {
   success: boolean;
@@ -42,7 +51,8 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+    const apiBase = getApiBase();
+    const url = endpoint.startsWith('http') ? endpoint : `${apiBase}${endpoint}`;
 
     try {
       const response = await fetch(url, {

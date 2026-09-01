@@ -54,6 +54,14 @@ export class ProductService {
   }
 
   public static async getProducts(filters: ProductFilterParams): Promise<IProduct[]> {
+    if (mongoose.connection.readyState !== 0 && process.env.NODE_ENV !== 'test') {
+      const count = await Product.countDocuments();
+      if (count === 0) {
+        const { SeedService } = await import('./seedService');
+        await SeedService.seedCatalogIfEmpty();
+      }
+    }
+
     const query: Record<string, unknown> = { isActive: true };
 
     if (filters.merchantId) {

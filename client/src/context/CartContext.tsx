@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { ApiClient } from '@/lib/api';
 
 export interface CartItem {
@@ -43,38 +43,24 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sellpilot_cart');
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [preparedCheckout, setPreparedCheckout] = useState<PreparedCheckout | null>(null);
   const [prepareCheckoutLoading, setPrepareCheckoutLoading] = useState<boolean>(false);
+  const isMountedRef = useRef(false);
 
-  // Load cart from local storage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('sellpilot_cart');
-      if (saved) {
-        setItems(JSON.parse(saved));
-      }
-    } catch {
-      // Ignore parse error
-    }
-  }, []);
-
-  // Save cart to local storage whenever items change
-  useEffect(() => {
-    try {
-      localStorage.setItem('sellpilot_cart', JSON.stringify(items));
-    } catch {
-      // Ignore
-    }
-    if (items.length > 0) {
-      refreshPreparedCheckout();
-    } else {
-      setPreparedCheckout(null);
-    }
-  }, [items]);
-
-  const refreshPreparedCheckout = async (): Promise<PreparedCheckout | null> => {
+  const refreshPreparedCheckout = useCallback(async (): Promise<PreparedCheckout | null> => {
     if (items.length === 0) {
       setPreparedCheckout(null);
       return null;
@@ -108,25 +94,18 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (res.success) {
-        const checkoutData: PreparedCheckout = {
+        const prep: PreparedCheckout = {
           subtotal: res.subtotal ?? items.reduce((acc, it) => acc + it.price * it.quantity, 0),
           discount: res.discount ?? 0,
           total: res.total ?? items.reduce((acc, it) => acc + it.price * it.quantity, 0),
-          currency: res.currency ?? 'INR',
-          items: res.items ?? items.map((it) => ({
-            productId: it.productId,
-            name: it.name,
-            price: it.price,
-            quantity: it.quantity,
-            lineTotal: it.price * it.quantity,
-          })),
+          currency: res.currency || 'INR',
+          items: res.items || [],
         };
-        setPreparedCheckout(checkoutData);
+        setPreparedCheckout(prep);
         setPrepareCheckoutLoading(false);
-        return checkoutData;
+        return prep;
       }
 
-      // Fallback calculation for display if server is offline
       const subtotal = items.reduce((acc, it) => acc + it.price * it.quantity, 0);
       const fallbackCheckout: PreparedCheckout = {
         subtotal,
@@ -163,7 +142,38 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setPrepareCheckoutLoading(false);
       return fallbackCheckout;
     }
-  };
+  }, [items]);
+
+  // Synchronize with localStorage after mount
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      try {
+        const saved = localStorage.getItem('sellpilot_cart');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setItems(parsed);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+      return;
+    }
+
+    try {
+      localStorage.setItem('sellpilot_cart', JSON.stringify(items));
+    } catch {
+      // Ignore
+    }
+
+    if (items.length > 0) {
+      refreshPreparedCheckout();
+    } else {
+      setPreparedCheckout(null);
+    }
+  }, [items, refreshPreparedCheckout]);
 
   const addItem = (
     item: { productId: string; name: string; price: number; category?: string; image?: string },
@@ -198,6 +208,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearCart = () => {
     setItems([]);
     setPreparedCheckout(null);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('sellpilot_cart');
+      } catch {
+        // Ignore
+      }
+    }
   };
 
   const itemCount = items.reduce((acc, it) => acc + it.quantity, 0);

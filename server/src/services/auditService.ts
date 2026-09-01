@@ -14,6 +14,9 @@ export interface CreateAuditLogParams {
 
 export class AuditService {
   public static async log(params: CreateAuditLogParams): Promise<IAuditLog | null> {
+    if (mongoose.connection.readyState === 0) {
+      return null;
+    }
     try {
       const log = new AuditLog({
         userId: params.userId,

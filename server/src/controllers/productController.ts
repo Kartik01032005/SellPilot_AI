@@ -123,4 +123,19 @@ export class ProductController {
       next(error);
     }
   }
+
+  public static async seedProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { SeedService } = await import('../services/seedService');
+      const result = await SeedService.seedCatalogIfEmpty();
+
+      res.status(200).json({
+        success: true,
+        message: 'Catalog seeded successfully',
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

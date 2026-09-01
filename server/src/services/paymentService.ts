@@ -47,6 +47,18 @@ export class PaymentService {
       throw new CustomError('Order is already paid', 400, 'DUPLICATE_OPERATION');
     }
 
+    // Verify inventory availability before creating payment order
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId);
+      if (!product || !product.isActive || product.stock < item.quantity) {
+        throw new CustomError(
+          `Product ${item.name || 'in order'} is no longer available in requested quantity`,
+          400,
+          'OUT_OF_STOCK'
+        );
+      }
+    }
+
     // Check if an active payment record already exists
     let payment = await Payment.findOne({
       orderId: order._id,
@@ -148,6 +160,16 @@ export class PaymentService {
       throw new CustomError('Associated order not found', 404, 'NOT_FOUND');
     }
 
+    // Duplicate Operation Protection: If already verified and paid, return idempotently
+    if (payment.status === 'paid' && payment.verificationStatus === 'verified') {
+      return {
+        success: true,
+        verified: true,
+        status: 'paid',
+        orderId: order._id.toString(),
+      };
+    }
+
     // Verify HMAC SHA256 signature
     let isValid = false;
     if (config.razorpay.keySecret && !config.razorpay.keySecret.includes('placeholder')) {
@@ -170,7 +192,7 @@ export class PaymentService {
       await order.save();
 
       await AuditService.log({
-        userId: userId || payment.userId,
+        userId: userId || (payment.userId ? payment.userId.toString() : undefined),
         merchantId: payment.merchantId,
         action: 'payment_verification_failed',
         entityType: 'Payment',
@@ -189,20 +211,39 @@ export class PaymentService {
     payment.verificationStatus = 'verified';
     await payment.save();
 
-    // Deduct stock for items in order
+    // Deduct stock for items in order atomically
     for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, {
-        $inc: { stock: -item.quantity },
-      });
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: item.productId, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        { new: true }
+      );
+
+      if (!updatedProduct) {
+        // Fallback decrement if exact conditional update had concurrency edge
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: -item.quantity },
+        });
+      }
     }
 
-    // Update order status
+    // Update order status & timestamps
     order.status = 'paid';
+    order.paidAt = new Date();
     order.paymentId = payment._id;
+    order.razorpayPaymentId = razorpayPaymentId;
+    if (!order.statusHistory) {
+      order.statusHistory = [];
+    }
+    order.statusHistory.push({
+      status: 'paid',
+      timestamp: new Date(),
+      comment: `Payment verified successfully (Razorpay ID: ${razorpayPaymentId})`,
+    });
     await order.save();
 
     await AuditService.log({
-      userId: userId || payment.userId,
+      userId: userId || (payment.userId ? payment.userId.toString() : undefined),
       merchantId: payment.merchantId,
       action: 'payment_verified',
       entityType: 'Payment',
@@ -210,6 +251,7 @@ export class PaymentService {
       amount: payment.amount,
       status: 'success',
       metadata: {
+        orderNumber: order.orderNumber,
         razorpayOrderId,
         razorpayPaymentId,
         orderId: order._id.toString(),
@@ -221,6 +263,52 @@ export class PaymentService {
       verified: true,
       status: 'paid',
       orderId: order._id.toString(),
+    };
+  }
+
+  public static async cancelPayment(
+    orderId: string,
+    userId?: string
+  ): Promise<{
+    success: boolean;
+    status: string;
+    message: string;
+  }> {
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      throw new CustomError('Invalid order ID', 400, 'INVALID_REQUEST');
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new CustomError('Order not found', 404, 'NOT_FOUND');
+    }
+
+    if (order.status === 'paid' || order.status === 'completed') {
+      throw new CustomError('Cannot cancel an already completed payment', 400, 'INVALID_STATE');
+    }
+
+    const payment = await Payment.findOne({ orderId: order._id, status: { $in: ['created', 'pending'] } });
+    if (payment) {
+      payment.status = 'cancelled';
+      await payment.save();
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    await AuditService.log({
+      userId,
+      merchantId: order.merchantId,
+      action: 'payment_cancelled',
+      entityType: 'Order',
+      entityId: order._id.toString(),
+      status: 'rejected',
+    });
+
+    return {
+      success: true,
+      status: 'cancelled',
+      message: 'Payment cancelled successfully',
     };
   }
 

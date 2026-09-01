@@ -53,13 +53,29 @@ export class PaymentController {
     }
   }
 
+  public static async cancelPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.body;
+      if (!orderId) {
+        throw new CustomError('orderId is required', 400, 'INVALID_REQUEST');
+      }
+
+      const result = await PaymentService.cancelPayment(orderId, req.user?.userId);
+
+      res.status(200).json({
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async getPaymentStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { orderId } = req.params;
       const status = await PaymentService.getPaymentStatus(orderId);
 
       res.status(200).json({
-        success: true,
         ...status,
       });
     } catch (error) {

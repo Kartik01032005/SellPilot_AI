@@ -313,9 +313,8 @@
 - [x] Test discount limits.
 - [x] Test order creation.
 - [x] Test payment creation.
-- [x] Test payment verification.
-- [ ] Test payment failure.
-- [ ] Test duplicate payment prevention.
+- [x] Test payment failure.
+- [x] Test duplicate payment prevention.
 - [x] Test audit logging.
 - [x] Test AI failure handling.
 - [x] Test multilingual input.
@@ -326,10 +325,10 @@
 - [x] Test unavailable product handling.
 - [x] Test unauthorized actions.
 - [x] Test discount limit enforcement.
-- [ ] Test missing confirmation.
-- [ ] Test failed payment handling.
-- [ ] Test uncertain payment state.
-- [ ] Test duplicate operation prevention.
+- [x] Test missing confirmation.
+- [x] Test failed payment handling.
+- [x] Test uncertain payment state.
+- [x] Test duplicate operation prevention.
 - [x] Test secret-key protection.
 - [x] Test backend validation.
 
@@ -350,14 +349,14 @@
 
 ## 28. Integration Testing
 
-- [ ] Test frontend-to-backend communication.
-- [ ] Test backend-to-database communication.
-- [ ] Test backend-to-Razorpay communication.
+- [x] Test frontend-to-backend communication.
+- [x] Test backend-to-database communication.
+- [x] Test backend-to-Razorpay communication.
 - [x] Test AI-to-backend tools.
 - [x] Test payment verification.
 - [x] Test order status updates.
 - [x] Test audit logging.
-- [ ] Test complete commerce flow.
+- [x] Test complete commerce flow.
 
 ## 29. Performance
 
@@ -412,10 +411,10 @@
 - [x] Campaign approval works.
 - [x] Discount limits work.
 - [x] Checkout works.
-- [ ] Razorpay Test Mode payment works.
-- [ ] Payment verification works.
-- [ ] Failure handling works.
-- [ ] Duplicate operation protection works.
+- [x] Razorpay Test Mode payment works.
+- [x] Payment verification works.
+- [x] Failure handling works.
+- [x] Duplicate operation protection works.
 - [x] Audit trail works.
 - [x] Multilingual input works.
 - [x] Responsive UI works.

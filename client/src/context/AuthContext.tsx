@@ -16,7 +16,13 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, role?: string) => Promise<{ success: boolean; message?: string }>;
-  register: (email: string, password?: string, role?: 'customer' | 'merchant', businessName?: string) => Promise<{ success: boolean; message?: string }>;
+  register: (
+    name: string,
+    email: string,
+    password?: string,
+    role?: 'customer' | 'merchant',
+    businessName?: string
+  ) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -85,6 +91,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const register = async (
+    name: string,
     email: string,
     password: string = 'password123',
     role: 'customer' | 'merchant' = 'customer',
@@ -94,7 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const res = await ApiClient.request<{ token: string; user: UserProfile }>('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ email, password, role, businessName }),
+        body: JSON.stringify({ name, email, password, role, businessName }),
       });
 
       if (res.success && res.token && res.user) {

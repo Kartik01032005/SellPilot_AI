@@ -1,12 +1,10 @@
 import mongoose from 'mongoose';
 import { IntentService, IntentResult, ExtractedRequirements } from './intentService';
-import { ProductService } from './productService';
-import { MerchantService } from './merchantService';
-import { CampaignService } from './campaignService';
+import { ToolRegistry, AgentToolContext } from './toolRegistry';
+import { ToolExecutionService, ToolExecutionResponse } from './toolExecutionService';
 import { ConversationService } from './conversationService';
+import { ConversationCartService } from './conversationCartService';
 import { AuditService } from './auditService';
-import { Product, IProduct } from '../models/Product';
-import { Merchant } from '../models/Merchant';
 import { CustomError } from '../middleware/errorHandler';
 
 export interface ChatRequestParams {
@@ -16,6 +14,15 @@ export interface ChatRequestParams {
   conversationId?: string;
   userId?: string;
   merchantId?: string;
+  userRole?: string;
+}
+
+export interface ToolExecutionSummary {
+  tool: string;
+  arguments: Record<string, unknown>;
+  success: boolean;
+  resultSummary: string;
+  executionTimeMs?: number;
 }
 
 export interface ChatResponseResult {
@@ -47,26 +54,28 @@ export interface ChatResponseResult {
     price: number;
     reason: string;
   }>;
+  cart?: {
+    items: any[];
+    totalItems: number;
+    subtotal: number;
+    currency: string;
+  };
+  toolsExecuted?: ToolExecutionSummary[];
   merchantInsights?: Record<string, unknown>;
   requiresConfirmation?: boolean;
   conversationId?: string;
 }
 
+/**
+ * In-memory cache of recent product search results per conversation / user session
+ * to allow referential actions like "add the second one to my cart".
+ */
+const sessionRecentProducts: Map<string, Array<{ id: string; name: string; price: number; stock: number }>> = new Map();
+
 export class AgentService {
   /**
-   * Translates or formats text based on selected language
+   * Main Agent Reasoning and Tool Execution Gateway
    */
-  private static formatResponseInLanguage(
-    text: string,
-    language: string,
-    translations?: Record<string, string>
-  ): string {
-    if (translations && translations[language]) {
-      return translations[language];
-    }
-    return text;
-  }
-
   public static async processChatMessage(params: ChatRequestParams): Promise<ChatResponseResult> {
     const rawMessage = (params.message || '').trim();
     if (!rawMessage) {
@@ -81,15 +90,15 @@ export class AgentService {
     const requirements = intentResult.requirements;
     const finalLanguage = reqLang !== 'en' ? reqLang : requirements.detectedLanguage || 'en';
 
-    // 2. Multi-turn context resolution
+    // 2. Conversation Context Resolution
     let conversation = null;
-    let recentProducts: IProduct[] = [];
+    const sessionKey = params.conversationId || params.userId || 'default_session';
 
     if (mongoose.connection.readyState !== 0) {
       if (params.conversationId && mongoose.Types.ObjectId.isValid(params.conversationId)) {
         try {
           conversation = await ConversationService.getConversationById(params.conversationId);
-        } catch (err) {
+        } catch {
           // Continue if conversation not found
         }
       }
@@ -103,159 +112,437 @@ export class AgentService {
             language: finalLanguage,
             initialMessage: { role: 'user', content: rawMessage },
           });
-        } catch (err) {
+        } catch {
           // Fallback gracefully
         }
       }
     }
 
-    // 3. Process Intent
+    const context: AgentToolContext = {
+      userId: params.userId,
+      merchantId: params.merchantId || (mode === 'merchant' ? params.userId : undefined),
+      userRole: params.userRole || (mode === 'merchant' ? 'merchant' : 'customer'),
+      conversationId: conversation?._id?.toString() || params.conversationId,
+      language: finalLanguage,
+    };
+
+    // 3. Dispatch to Agent Reasoning Layer
     if (mode === 'merchant') {
-      return await this.handleMerchantFlow(params, intentResult, finalLanguage, conversation?._id?.toString());
+      return await this.executeMerchantAgentFlow(params, intentResult, finalLanguage, context, sessionKey);
     } else {
-      return await this.handleBuyerFlow(params, intentResult, finalLanguage, conversation?._id?.toString());
+      return await this.executeBuyerAgentFlow(params, intentResult, finalLanguage, context, sessionKey);
     }
   }
 
   /**
-   * Buyer Journey Orchestrator
+   * Buyer Agent Tool Orchestration Flow
    */
-  private static async handleBuyerFlow(
+  private static async executeBuyerAgentFlow(
     params: ChatRequestParams,
     intentResult: IntentResult,
     language: string,
-    conversationId?: string
+    context: AgentToolContext,
+    sessionKey: string
   ): Promise<ChatResponseResult> {
     const { intent, requirements, rawMessage } = intentResult;
+    const toolsExecuted: ToolExecutionSummary[] = [];
 
-    // Purchase / Checkout intent
+    // CASE 1: Checkout / Payment Request
     if (intent === 'PURCHASE_REQUEST' || intent === 'PAYMENT_REQUEST') {
+      // Execute calculateCart tool to verify final amounts
+      const calcResult = await ToolExecutionService.executeTool({
+        toolName: 'calculateCart',
+        arguments: { conversationId: context.conversationId, userId: context.userId },
+        context,
+      });
+
+      if (calcResult.success && calcResult.data) {
+        toolsExecuted.push({
+          tool: 'calculateCart',
+          arguments: calcResult.arguments,
+          success: true,
+          resultSummary: `Calculated verified subtotal: ₹${calcResult.data.subtotal}, total: ₹${calcResult.data.total}`,
+          executionTimeMs: calcResult.executionTimeMs,
+        });
+      }
+
       return {
         success: true,
         intent: 'PURCHASE_REQUEST',
         message: 'Your total is ready. Ready to continue to secure Razorpay Test Mode checkout?',
         language,
         mode: 'buyer',
+        toolsExecuted,
         requiresConfirmation: true,
-        conversationId,
+        conversationId: context.conversationId,
       };
     }
 
-    // If database is disconnected (e.g. in unit tests without mock DB), provide fallback search response
-    if (mongoose.connection.readyState === 0) {
-      const cat = requirements.category || 'Shoes';
-      const maxP = requirements.maxPrice || 3000;
-      return {
-        success: true,
-        intent: intent || 'PRODUCT_SEARCH',
-        message: `I found products matching ${cat} under ₹${maxP}. Pro Running Shoes are a strong recommendation fitting your budget.`,
-        language,
-        mode: 'buyer',
-        products: [
-          {
-            id: 'mock_prod_1',
-            name: `Pro ${cat}`,
-            price: Math.min(2999, maxP),
-            currency: 'INR',
-            stock: 15,
-            category: cat,
-            available: true,
-            reason: `Matches your ${cat} search and fits within your ₹${maxP} budget.`,
+    // CASE 2: Add to Cart (Direct or Referential e.g., "Add the second one to my cart")
+    if (intent === 'ADD_TO_CART') {
+      let targetIdentifier: string | undefined = requirements.targetProductName;
+      let targetProductFromContext: { id: string; name: string } | undefined;
+
+      // Handle ordinal references (e.g. "add the second one")
+      if (requirements.targetOrdinal) {
+        const recentList = sessionRecentProducts.get(sessionKey) || [];
+        const index = requirements.targetOrdinal - 1;
+        if (recentList[index]) {
+          targetProductFromContext = recentList[index];
+          targetIdentifier = targetProductFromContext.id;
+        }
+      }
+
+      // If no ordinal matched, check if keywords or category identify a single item or recent item
+      if (!targetIdentifier) {
+        const recentList = sessionRecentProducts.get(sessionKey) || [];
+        if (recentList.length > 0) {
+          targetProductFromContext = recentList[0];
+          targetIdentifier = targetProductFromContext.id;
+        } else {
+          targetIdentifier = requirements.category || 'Pro Running Shoes';
+        }
+      }
+
+      // Step A: Check inventory tool
+      const invResult = await ToolExecutionService.executeTool({
+        toolName: 'checkInventory',
+        arguments: {
+          productId: mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          name: !mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          requestedQuantity: requirements.quantity || 1,
+        },
+        context,
+      });
+
+      if (invResult.success && invResult.data) {
+        toolsExecuted.push({
+          tool: 'checkInventory',
+          arguments: invResult.arguments,
+          success: true,
+          resultSummary: `Verified ${invResult.data.productName} stock: ${invResult.data.stock} available.`,
+          executionTimeMs: invResult.executionTimeMs,
+        });
+      }
+
+      // Step B: Add to cart tool
+      const addResult = await ToolExecutionService.executeTool({
+        toolName: 'addToCart',
+        arguments: {
+          productId: mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          name: !mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          quantity: requirements.quantity || 1,
+          conversationId: context.conversationId,
+          userId: context.userId,
+        },
+        context,
+      });
+
+      if (addResult.success && addResult.data) {
+        toolsExecuted.push({
+          tool: 'addToCart',
+          arguments: addResult.arguments,
+          success: true,
+          resultSummary: `Added ${addResult.data.addedItem.name} (Qty: ${addResult.data.addedItem.quantity}) to cart. Total items: ${addResult.data.totalItems}.`,
+          executionTimeMs: addResult.executionTimeMs,
+        });
+
+        // Step C: Suggest cross-sell complementary item
+        const crossResult = await ToolExecutionService.executeTool({
+          toolName: 'getCrossSells',
+          arguments: {
+            productId: addResult.data.addedItem.productId,
+            name: addResult.data.addedItem.name,
           },
-        ],
-        conversationId,
-      };
+          context,
+        });
+
+        let crossSells: any[] = [];
+        if (crossResult.success && crossResult.data?.crossSells) {
+          crossSells = crossResult.data.crossSells;
+          toolsExecuted.push({
+            tool: 'getCrossSells',
+            arguments: crossResult.arguments,
+            success: true,
+            resultSummary: `Found ${crossSells.length} complementary cross-sell item(s).`,
+            executionTimeMs: crossResult.executionTimeMs,
+          });
+        }
+
+        const itemName = addResult.data.addedItem.name;
+        return {
+          success: true,
+          intent: 'ADD_TO_CART',
+          message: `I've added ${itemName} (₹${addResult.data.addedItem.price}) to your cart. Your cart now has ${addResult.data.totalItems} item${addResult.data.totalItems > 1 ? 's' : ''} totaling ₹${addResult.data.subtotal.toLocaleString('en-IN')}.`,
+          language,
+          mode: 'buyer',
+          cart: {
+            items: [addResult.data.addedItem],
+            totalItems: addResult.data.totalItems,
+            subtotal: addResult.data.subtotal,
+            currency: addResult.data.addedItem.currency,
+          },
+          crossSells,
+          toolsExecuted,
+          conversationId: context.conversationId,
+        };
+      } else {
+        return {
+          success: false,
+          intent: 'ADD_TO_CART',
+          message: addResult.error || 'Could not add the item to your cart due to inventory constraints.',
+          language,
+          mode: 'buyer',
+          toolsExecuted,
+          conversationId: context.conversationId,
+        };
+      }
     }
 
-    // Follow-up: "Which is cheapest?"
-    if (requirements.isCheapestRequested) {
-      const cheapestProduct = await Product.findOne({
-        isActive: true,
-        stock: { $gt: 0 },
-        ...(requirements.category ? { category: { $regex: new RegExp(`^${requirements.category}$`, 'i') } } : {}),
-      }).sort({ price: 1 });
+    // CASE 3: View Cart
+    if (intent === 'VIEW_CART') {
+      const cartResult = await ToolExecutionService.executeTool({
+        toolName: 'getCart',
+        arguments: { conversationId: context.conversationId, userId: context.userId },
+        context,
+      });
 
-      if (cheapestProduct) {
-        const reply = `The cheapest available option is ${cheapestProduct.name} at ₹${cheapestProduct.price}.`;
+      if (cartResult.success && cartResult.data) {
+        toolsExecuted.push({
+          tool: 'getCart',
+          arguments: cartResult.arguments,
+          success: true,
+          resultSummary: `Retrieved ${cartResult.data.totalItems} item(s) from cart with subtotal ₹${cartResult.data.subtotal}.`,
+          executionTimeMs: cartResult.executionTimeMs,
+        });
+
+        const items = cartResult.data.items;
+        let responseMsg = '';
+        if (items.length === 0) {
+          responseMsg = 'Your cart is currently empty. Tell me what products you are looking for!';
+        } else {
+          const itemSummary = items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ');
+          responseMsg = `Your cart contains: ${itemSummary}. Total amount: ₹${cartResult.data.subtotal.toLocaleString('en-IN')}.`;
+        }
+
+        return {
+          success: true,
+          intent: 'VIEW_CART',
+          message: responseMsg,
+          language,
+          mode: 'buyer',
+          cart: cartResult.data,
+          toolsExecuted,
+          conversationId: context.conversationId,
+        };
+      }
+    }
+
+    // CASE 4: Remove from Cart
+    if (intent === 'REMOVE_FROM_CART') {
+      const targetIdentifier = requirements.targetProductName || requirements.category || 'Shoes';
+      const removeResult = await ToolExecutionService.executeTool({
+        toolName: 'removeFromCart',
+        arguments: {
+          name: targetIdentifier,
+          conversationId: context.conversationId,
+          userId: context.userId,
+        },
+        context,
+      });
+
+      if (removeResult.success && removeResult.data) {
+        toolsExecuted.push({
+          tool: 'removeFromCart',
+          arguments: removeResult.arguments,
+          success: true,
+          resultSummary: `Removed item from cart. Remaining items: ${removeResult.data.remainingItems}.`,
+          executionTimeMs: removeResult.executionTimeMs,
+        });
+
+        return {
+          success: true,
+          intent: 'REMOVE_FROM_CART',
+          message: `Removed ${removeResult.data.removedName || targetIdentifier} from your cart. Remaining total: ₹${removeResult.data.subtotal.toLocaleString('en-IN')}.`,
+          language,
+          mode: 'buyer',
+          toolsExecuted,
+          conversationId: context.conversationId,
+        };
+      }
+    }
+
+    // CASE 5: Product Comparison / "Which is cheapest?"
+    if (intent === 'PRODUCT_COMPARISON' || requirements.comparisonRequested || requirements.isCheapestRequested) {
+      const compareResult = await ToolExecutionService.executeTool({
+        toolName: 'compareProducts',
+        arguments: {
+          category: requirements.category,
+        },
+        context,
+      });
+
+      if (compareResult.success && compareResult.data?.comparison?.length > 0) {
+        toolsExecuted.push({
+          tool: 'compareProducts',
+          arguments: compareResult.arguments,
+          success: true,
+          resultSummary: `Compared ${compareResult.data.comparison.length} products in ${requirements.category || 'catalog'}.`,
+          executionTimeMs: compareResult.executionTimeMs,
+        });
+
+        const items = compareResult.data.comparison;
+        const cheapest = items[0];
+        const msg = requirements.isCheapestRequested
+          ? `The cheapest available option is ${cheapest.name} at ₹${cheapest.price.toLocaleString('en-IN')}.`
+          : `Comparing ${items.length} options: ${items.map((it: any) => `${it.name} (₹${it.price})`).join(' vs ')}.`;
+
+        sessionRecentProducts.set(
+          sessionKey,
+          items.map((p: any) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock }))
+        );
+
         return {
           success: true,
           intent: 'PRODUCT_COMPARISON',
-          message: reply,
+          message: msg,
           language,
           mode: 'buyer',
-          products: [
-            {
-              id: cheapestProduct._id.toString(),
-              name: cheapestProduct.name,
-              price: cheapestProduct.price,
-              currency: cheapestProduct.currency,
-              stock: cheapestProduct.stock,
-              category: cheapestProduct.category,
-              available: cheapestProduct.stock > 0,
-              reason: 'Lowest price matching your query.',
-            },
-          ],
-          conversationId,
+          products: items.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            currency: p.currency || 'INR',
+            stock: p.stock,
+            category: p.category,
+            available: p.stock > 0,
+            reason: p.id === cheapest.id ? 'Lowest price matching your query.' : 'Verified comparison candidate.',
+          })),
+          toolsExecuted,
+          conversationId: context.conversationId,
         };
       }
     }
 
-    // Query Products from MongoDB (source of truth)
-    const filterQuery: Record<string, unknown> = { isActive: true };
-    if (requirements.category) {
-      filterQuery.category = { $regex: new RegExp(`^${requirements.category}$`, 'i') };
-    }
-    if (requirements.maxPrice !== undefined) {
-      filterQuery.price = { $lte: requirements.maxPrice };
-    }
-    if (requirements.minPrice !== undefined) {
-      filterQuery.price = { ...(filterQuery.price as object || {}), $gte: requirements.minPrice };
-    }
+    // CASE 6: Cross-sell / "What else should I buy with it?"
+    if (intent === 'CROSS_SELL') {
+      const recentList = sessionRecentProducts.get(sessionKey) || [];
+      const primaryProduct = recentList[0];
 
-    let products = await Product.find(filterQuery)
-      .populate('relatedProducts', 'name price category stock currency isActive')
-      .sort({ price: 1 })
-      .limit(5)
-      .exec();
-
-    // Fallback: If no exact category matched, search by keywords
-    if (products.length === 0 && requirements.keywords.length > 0) {
-      products = await Product.find({
-        isActive: true,
-        $or: requirements.keywords.map((kw) => ({
-          $or: [
-            { name: { $regex: kw, $options: 'i' } },
-            { description: { $regex: kw, $options: 'i' } },
-            { category: { $regex: kw, $options: 'i' } },
-          ],
-        })),
-      })
-        .populate('relatedProducts', 'name price category stock currency isActive')
-        .limit(5)
-        .exec();
-    }
-
-    // Out of Stock Handling & Zero Results
-    if (products.length === 0) {
-      // Check if item exists in catalog but is out of stock
-      const outOfStockItem = await Product.findOne({
-        isActive: true,
-        stock: 0,
-        ...(requirements.category ? { category: { $regex: new RegExp(`^${requirements.category}$`, 'i') } } : {}),
+      const crossResult = await ToolExecutionService.executeTool({
+        toolName: 'getCrossSells',
+        arguments: {
+          productId: primaryProduct?.id,
+          name: primaryProduct?.name || requirements.category || 'Running Shoes',
+        },
+        context,
       });
 
-      if (outOfStockItem) {
-        return {
+      let crossSells: any[] = [];
+      if (crossResult.success && crossResult.data?.crossSells) {
+        crossSells = crossResult.data.crossSells;
+        toolsExecuted.push({
+          tool: 'getCrossSells',
+          arguments: crossResult.arguments,
           success: true,
-          intent: 'AVAILABILITY_INQUIRY',
-          message: `The ${outOfStockItem.name} is currently out of stock. I can show you other available categories.`,
-          language,
-          mode: 'buyer',
-          products: [],
-          conversationId,
-        };
+          resultSummary: `Retrieved ${crossSells.length} complementary cross-sell recommendations.`,
+          executionTimeMs: crossResult.executionTimeMs,
+        });
       }
 
+      const topCross = crossSells[0];
+      const message = topCross
+        ? `We recommend pairing with ${topCross.name} (₹${topCross.price}). ${topCross.reason}`
+        : 'Based on our catalog, moisture-wicking sports socks or protective carrying cases pair well with this item.';
+
+      return {
+        success: true,
+        intent: 'CROSS_SELL',
+        message,
+        language,
+        mode: 'buyer',
+        crossSells,
+        toolsExecuted,
+        conversationId: context.conversationId,
+      };
+    }
+
+    // CASE 7: Upsell Request
+    if (intent === 'UPSELL') {
+      const recentList = sessionRecentProducts.get(sessionKey) || [];
+      const primaryProduct = recentList[0];
+
+      const upsellResult = await ToolExecutionService.executeTool({
+        toolName: 'getUpsell',
+        arguments: {
+          productId: primaryProduct?.id,
+          name: primaryProduct?.name || requirements.category || 'Shoes',
+        },
+        context,
+      });
+
+      let upsellData = null;
+      if (upsellResult.success && upsellResult.data?.upsell) {
+        upsellData = upsellResult.data.upsell;
+        toolsExecuted.push({
+          tool: 'getUpsell',
+          arguments: upsellResult.arguments,
+          success: true,
+          resultSummary: `Found premium upsell option: ${upsellData.name} (+₹${upsellData.priceDiff}).`,
+          executionTimeMs: upsellResult.executionTimeMs,
+        });
+      }
+
+      const message = upsellData
+        ? `Consider the ${upsellData.name} for ₹${upsellData.priceDiff} more. ${upsellData.reason}`
+        : 'You are currently viewing the top configuration in this tier.';
+
+      return {
+        success: true,
+        intent: 'UPSELL',
+        message,
+        language,
+        mode: 'buyer',
+        upsell: upsellData,
+        toolsExecuted,
+        conversationId: context.conversationId,
+      };
+    }
+
+    // CASE 8: Product Search & Recommendation (Default Discovery Tool Flow)
+    const searchResult = await ToolExecutionService.executeTool({
+      toolName: 'searchProducts',
+      arguments: {
+        category: requirements.category,
+        query: requirements.keywords.join(' ') || rawMessage,
+        keywords: requirements.keywords,
+        minPrice: requirements.minPrice,
+        maxPrice: requirements.maxPrice,
+        features: requirements.features,
+        inStockOnly: true,
+      },
+      context,
+    });
+
+    let foundProducts: any[] = [];
+    if (searchResult.success && searchResult.data) {
+      foundProducts = searchResult.data.products;
+      toolsExecuted.push({
+        tool: 'searchProducts',
+        arguments: searchResult.arguments,
+        success: true,
+        resultSummary: `Found ${foundProducts.length} verified product(s) in catalog.`,
+        executionTimeMs: searchResult.executionTimeMs,
+      });
+
+      // Cache recent search products for referential queries like "add the second one"
+      sessionRecentProducts.set(
+        sessionKey,
+        foundProducts.map((p) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock }))
+      );
+    }
+
+    if (foundProducts.length === 0) {
       return {
         success: true,
         intent: intent || 'PRODUCT_SEARCH',
@@ -263,73 +550,61 @@ export class AgentService {
         language,
         mode: 'buyer',
         products: [],
-        conversationId,
+        toolsExecuted,
+        conversationId: context.conversationId,
       };
     }
 
-    // Explainable recommendation formatting
-    const formattedProducts = products.map((p) => ({
-      id: p._id.toString(),
-      name: p.name,
-      price: p.price,
-      currency: p.currency || 'INR',
-      stock: p.stock,
-      category: p.category,
-      available: p.stock > 0,
-      reason:
-        p.stock > 0
-          ? `Fits your ${p.category} search and is within your ₹${requirements.maxPrice || p.price} budget.`
-          : 'Currently out of stock.',
-    }));
+    // Execute upsell and cross-sell tools for primary product
+    const primary = foundProducts[0];
+    let upsellPayload = null;
+    let crossSellsPayload: any[] = [];
 
-    // Find Upsell for the primary product
-    let upsellResult = null;
-    const primary = products[0];
     if (primary) {
-      const upsellOption = await Product.findOne({
-        category: primary.category,
-        price: { $gt: primary.price, $lte: primary.price * 1.6 },
-        stock: { $gt: 0 },
-        isActive: true,
-        _id: { $ne: primary._id },
-      }).sort({ price: 1 });
+      const [upsellRes, crossRes] = await Promise.all([
+        ToolExecutionService.executeTool({
+          toolName: 'getUpsell',
+          arguments: { productId: primary.id, name: primary.name },
+          context,
+        }),
+        ToolExecutionService.executeTool({
+          toolName: 'getCrossSells',
+          arguments: { productId: primary.id, name: primary.name },
+          context,
+        }),
+      ]);
 
-      if (upsellOption) {
-        const priceDiff = upsellOption.price - primary.price;
-        upsellResult = {
-          productId: upsellOption._id.toString(),
-          name: upsellOption.name,
-          price: upsellOption.price,
-          priceDiff,
-          reason: `The ${upsellOption.name} is ₹${priceDiff} more and offers premium features.`,
-        };
+      if (upsellRes.success && upsellRes.data?.upsell) {
+        upsellPayload = upsellRes.data.upsell;
+        toolsExecuted.push({
+          tool: 'getUpsell',
+          arguments: upsellRes.arguments,
+          success: true,
+          resultSummary: `Found upsell: ${upsellPayload.name}`,
+          executionTimeMs: upsellRes.executionTimeMs,
+        });
+      }
+
+      if (crossRes.success && crossRes.data?.crossSells) {
+        crossSellsPayload = crossRes.data.crossSells;
+        toolsExecuted.push({
+          tool: 'getCrossSells',
+          arguments: crossRes.arguments,
+          success: true,
+          resultSummary: `Found ${crossSellsPayload.length} cross-sell accessory item(s)`,
+          executionTimeMs: crossRes.executionTimeMs,
+        });
       }
     }
 
-    // Find Cross-Sells for the primary product
-    const crossSells: Array<{ productId: string; name: string; price: number; reason: string }> = [];
-    if (primary && primary.relatedProducts && primary.relatedProducts.length > 0) {
-      for (const rel of primary.relatedProducts as any[]) {
-        if (rel && rel.isActive && rel.stock > 0) {
-          crossSells.push({
-            productId: rel._id.toString(),
-            name: rel.name,
-            price: rel.price,
-            reason: `Complementary accessory commonly purchased with ${primary.name}.`,
-          });
-        }
-      }
-    }
-
-    // Natural Language Response
-    let responseText = `I found ${products.length} matching product${products.length > 1 ? 's' : ''}`;
+    let responseText = `I found ${foundProducts.length} matching product${foundProducts.length > 1 ? 's' : ''}`;
     if (requirements.maxPrice) {
-      responseText += ` under ₹${requirements.maxPrice}`;
+      responseText += ` under ₹${requirements.maxPrice.toLocaleString('en-IN')}`;
     }
-    responseText += `. The ${primary.name} at ₹${primary.price} is a great choice with strong availability.`;
+    responseText += `. The ${primary.name} at ₹${primary.price.toLocaleString('en-IN')} is a great choice with strong availability.`;
 
-    if (upsellResult) {
-      responseText += ` We also offer ${upsellResult.name} for ₹${upsellResult.priceDiff} more.`;
+    if (upsellPayload) {
+      responseText += ` We also offer ${upsellPayload.name} for ₹${upsellPayload.priceDiff} more.`;
     }
 
     return {
@@ -338,90 +613,90 @@ export class AgentService {
       message: responseText,
       language,
       mode: 'buyer',
-      products: formattedProducts,
-      upsell: upsellResult,
-      crossSells: crossSells.slice(0, 2),
-      conversationId,
+      products: foundProducts,
+      upsell: upsellPayload,
+      crossSells: crossSellsPayload.slice(0, 2),
+      toolsExecuted,
+      conversationId: context.conversationId,
     };
   }
 
   /**
-   * Merchant Growth & Promotion Orchestrator
+   * Merchant Agent Tool Orchestration Flow
    */
-  private static async handleMerchantFlow(
+  private static async executeMerchantAgentFlow(
     params: ChatRequestParams,
     intentResult: IntentResult,
     language: string,
-    conversationId?: string
+    context: AgentToolContext,
+    sessionKey: string
   ): Promise<ChatResponseResult> {
     const { intent, rawMessage } = intentResult;
-    const merchantId = params.merchantId || params.userId;
+    const toolsExecuted: ToolExecutionSummary[] = [];
 
-    if (!merchantId || !mongoose.Types.ObjectId.isValid(merchantId)) {
-      throw new CustomError('Merchant authorization required for merchant mode', 403, 'FORBIDDEN');
-    }
-
-    if (mongoose.connection.readyState === 0) {
-      // Check discount limit if requested in test mode
-      const discountMatch = rawMessage.match(/(\d+)%\s*discount/i);
-      if (discountMatch) {
-        const requestedPct = parseInt(discountMatch[1], 10);
-        if (requestedPct > 25) {
-          return {
-            success: false,
-            intent: 'DISCOUNT_RECOMMENDATION',
-            message: `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of 25%.`,
-            language,
-            mode: 'merchant',
-            conversationId,
-          };
-        }
-      }
-
-      return {
-        success: true,
-        intent: intent || 'PRODUCT_PROMOTION',
-        message: 'Running Shoes are a strong promotion opportunity based on catalog demand. Consider cross-selling Sports Socks.',
-        language,
-        mode: 'merchant',
-        merchantInsights: {
-          promotionOpportunities: [{ name: 'Running Shoes', suggestedDiscount: 10 }],
-        },
-        conversationId,
-      };
-    }
-
-    const merchant = await Merchant.findById(merchantId);
-    if (!merchant) {
-      throw new CustomError('Merchant account not found', 404, 'NOT_FOUND');
-    }
-
-    // 1. Discount Request / Unsafe Limit Check
+    // Guardrail Check Tool: validateDiscount
     const discountMatch = rawMessage.match(/(\d+)%\s*discount/i);
     if (discountMatch) {
       const requestedPct = parseInt(discountMatch[1], 10);
-      if (requestedPct > merchant.maxDiscountPercentage) {
-        return {
-          success: false,
-          intent: 'DISCOUNT_RECOMMENDATION',
-          message: `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of ${merchant.maxDiscountPercentage}%.`,
-          language,
-          mode: 'merchant',
-          conversationId,
-        };
+      const discountValidationRes = await ToolExecutionService.executeTool({
+        toolName: 'validateDiscount',
+        arguments: { discountPercentage: requestedPct, merchantId: context.merchantId },
+        context,
+      });
+
+      if (discountValidationRes.success && discountValidationRes.data) {
+        toolsExecuted.push({
+          tool: 'validateDiscount',
+          arguments: discountValidationRes.arguments,
+          success: true,
+          resultSummary: `Validated ${requestedPct}% discount. Allowed: ${discountValidationRes.data.valid} (Max: ${discountValidationRes.data.maxAllowed}%).`,
+          executionTimeMs: discountValidationRes.executionTimeMs,
+        });
+
+        if (!discountValidationRes.data.valid) {
+          return {
+            success: false,
+            intent: 'DISCOUNT_RECOMMENDATION',
+            message: `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of ${discountValidationRes.data.maxAllowed}%.`,
+            language,
+            mode: 'merchant',
+            toolsExecuted,
+            conversationId: context.conversationId,
+          };
+        }
       }
     }
 
-    // 2. Fetch Merchant Insights
-    const insights = await MerchantService.getInsights(merchantId);
+    // Tool: getMerchantInsights
+    const insightsResult = await ToolExecutionService.executeTool({
+      toolName: 'getMerchantInsights',
+      arguments: { merchantId: context.merchantId },
+      context,
+    });
 
-    // 3. Formulate explainable growth recommendation based on intent
+    if (!insightsResult.success) {
+      throw new CustomError(
+        insightsResult.error || 'Merchant authorization required for merchant mode',
+        403,
+        'FORBIDDEN'
+      );
+    }
+
+    toolsExecuted.push({
+      tool: 'getMerchantInsights',
+      arguments: insightsResult.arguments,
+      success: true,
+      resultSummary: 'Retrieved real-time promotion opportunities, top performers, and cross-sell metrics.',
+      executionTimeMs: insightsResult.executionTimeMs,
+    });
+
+    const insights = insightsResult.data.insights;
+    const topOpportunity = insights.promotionOpportunities?.[0];
+    const topCrossSell = insights.crossSellOpportunities?.[0];
+    const topUpsell = insights.upsellOpportunities?.[0];
+    const topProduct = insights.topProducts?.[0];
+
     let responseText = '';
-    const topOpportunity = insights.promotionOpportunities[0];
-    const topCrossSell = insights.crossSellOpportunities[0];
-    const topUpsell = insights.upsellOpportunities[0];
-    const topProduct = insights.topProducts[0];
-
     if (intent === 'UPSELL_OPPORTUNITY' && topUpsell) {
       responseText = `Consider offering ${topUpsell.premiumName} as a premium alternative when customers view ${topUpsell.name} (₹${topUpsell.priceDiff} difference).`;
     } else if (intent === 'CROSS_SELL_OPPORTUNITY' && topCrossSell) {
@@ -436,28 +711,15 @@ export class AgentService {
       responseText = `Based on current catalog demand, your inventory is well-balanced across active categories.`;
     }
 
-    // Log AI Growth Recommendation in Audit Trail
-    await AuditService.log({
-      userId: params.userId,
-      merchantId,
-      action: 'merchant_growth_recommendation',
-      entityType: 'Merchant',
-      entityId: merchant._id.toString(),
-      status: 'success',
-      metadata: {
-        intent: intent || 'PRODUCT_PROMOTION',
-        suggestedProduct: topOpportunity?.name,
-      },
-    });
-
     return {
       success: true,
       intent: intent || 'PRODUCT_PROMOTION',
       message: responseText,
       language,
       mode: 'merchant',
-      merchantInsights: insights as any,
-      conversationId,
+      merchantInsights: insights,
+      toolsExecuted,
+      conversationId: context.conversationId,
     };
   }
 }

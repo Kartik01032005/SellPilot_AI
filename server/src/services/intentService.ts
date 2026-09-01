@@ -7,6 +7,9 @@ export type BuyerIntent =
   | 'PRODUCT_DETAILS'
   | 'UPSELL'
   | 'CROSS_SELL'
+  | 'ADD_TO_CART'
+  | 'VIEW_CART'
+  | 'REMOVE_FROM_CART'
   | 'PURCHASE_REQUEST'
   | 'PAYMENT_REQUEST'
   | 'PAYMENT_STATUS'
@@ -43,6 +46,8 @@ export interface ExtractedRequirements {
   isCheapestRequested?: boolean;
   isBestRequested?: boolean;
   comparisonRequested?: boolean;
+  targetOrdinal?: number; // 1 for first, 2 for second, 3 for third, etc.
+  targetProductName?: string;
 }
 
 export interface IntentResult {
@@ -87,13 +92,31 @@ export class IntentService {
       requirements.detectedLanguage = 'te'; // Telugu
     }
 
+    // Ordinal extraction: "first one", "second one", "2nd one", "3rd product", "last one"
+    if (/\b(first|1st|pehla|modalaneyadhu)\b/i.test(text)) {
+      requirements.targetOrdinal = 1;
+    } else if (/\b(second|2nd|doosra|eradaneyadhu)\b/i.test(text)) {
+      requirements.targetOrdinal = 2;
+    } else if (/\b(third|3rd|teesra|mooroneyadhu)\b/i.test(text)) {
+      requirements.targetOrdinal = 3;
+    } else if (/\b(fourth|4th|chautha)\b/i.test(text)) {
+      requirements.targetOrdinal = 4;
+    }
+
+    // Quantity extraction: "2 shoes", "quantity 3", "x2"
+    const qtyMatch = text.match(/\b(?:quantity|qty|count|buy|add)?\s*(\d+)\s*(?:items|units|pcs|pieces|pairs)?\b/i);
+    if (qtyMatch && qtyMatch[1] && !text.includes('under') && !text.includes('rs') && !text.includes('₹')) {
+      const parsedQty = parseInt(qtyMatch[1], 10);
+      if (parsedQty > 0 && parsedQty <= 50) {
+        requirements.quantity = parsedQty;
+      }
+    }
+
     // Price extraction: "under 3000", "under 3k", "below 50000", "< 500", "upto 2500"
-    const maxPriceRegex = /(?:under|below|less than|upto|within|max|<=?|₹|rs\.?|inr)?\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?k|\d+)\s*(?:rupees|rs|inr)?\b/gi;
     const underMatch = text.match(/(?:under|below|less than|upto|within|max|<=)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?k|\d+)/i);
     if (underMatch && underMatch[1]) {
       requirements.maxPrice = this.parsePriceValue(underMatch[1]);
     } else {
-      // Direct number after under/below
       const directUnder = text.match(/under\s+(\d+k|\d+)/i);
       if (directUnder && directUnder[1]) {
         requirements.maxPrice = this.parsePriceValue(directUnder[1]);
@@ -116,7 +139,7 @@ export class IntentService {
     // Category extraction
     const categoriesMap: Record<string, string[]> = {
       'Shoes': ['shoe', 'shoes', 'running shoes', 'sneakers', 'boots', 'footwear', 'pro shoes'],
-      'Laptops': ['laptop', 'laptops', 'notebook', 'macbook', 'pc', 'pro laptop'],
+      'Laptops': ['laptop', 'laptops', 'notebook', 'macbook', 'pc', 'pro laptop', 'gaming laptop'],
       'Phones': ['phone', 'phones', 'smartphone', 'mobile', 'iphone', 'android'],
       'Cameras': ['camera', 'cameras', 'dslr', 'lens'],
       'Accessories': ['socks', 'sports socks', 'bag', 'laptop bag', 'case', 'phone case', 'memory card', 'charger', 'cable', 'headphone', 'headphones'],
@@ -170,6 +193,27 @@ export class IntentService {
       return 'UNKNOWN';
     }
 
+    // Add to Cart
+    if (
+      /\b(add\b.*(?:cart|bag)|put\b.*(?:cart|bag)|add the second one|add the first one|add second|add first|add to cart|add to my cart)\b/i.test(text)
+    ) {
+      return 'ADD_TO_CART';
+    }
+
+    // View Cart
+    if (
+      /\b(view cart|show cart|what is in my cart|whats in my cart|check cart|cart items|cart total|open cart|see my cart)\b/i.test(text)
+    ) {
+      return 'VIEW_CART';
+    }
+
+    // Remove from Cart
+    if (
+      /\b(remove from cart|delete from cart|take out of cart|remove item)\b/i.test(text)
+    ) {
+      return 'REMOVE_FROM_CART';
+    }
+
     // Payment / Order Status
     if (/\b(payment status|status of payment|transaction status|did my payment go through)\b/i.test(text)) {
       return 'PAYMENT_STATUS';
@@ -179,7 +223,7 @@ export class IntentService {
     }
 
     // Checkout / Purchase Request
-    if (/\b(buy it|buy this|checkout|order now|proceed to payment|purchase|place order|pay now|yes buy|ready to buy)\b/i.test(text)) {
+    if (/\b(buy it|buy this|checkout|order now|proceed to payment|purchase|place order|pay now|yes buy|ready to buy|proceed to verified checkout)\b/i.test(text)) {
       return 'PURCHASE_REQUEST';
     }
     if (/\b(pay|payment|make payment|razorpay)\b/i.test(text) && !/\b(status|why)\b/i.test(text)) {
@@ -192,7 +236,7 @@ export class IntentService {
     }
 
     // Availability / Inventory inquiry
-    if (/\b(is this available|in stock|out of stock|available|do you have stock)\b/i.test(text)) {
+    if (/\b(is this available|in stock|out of stock|available|do you have stock|how many in stock)\b/i.test(text)) {
       return 'AVAILABILITY_INQUIRY';
     }
 
@@ -211,8 +255,8 @@ export class IntentService {
       return 'UPSELL';
     }
 
-    // Cross sell inquiry
-    if (/\b(accessory|accessories|related item|goes with|complementary|matching)\b/i.test(text)) {
+    // Cross sell inquiry / "What else should I buy with it?"
+    if (/\b(what else should i buy|what else should i get|accessory|accessories|related item|goes with|complementary|matching|bundle with)\b/i.test(text)) {
       return 'CROSS_SELL';
     }
 

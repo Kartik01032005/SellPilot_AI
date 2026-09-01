@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
+import { Manrope } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-manrope',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'SellPilot AI — AI Growth & Agentic Commerce',
@@ -13,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="antialiased min-h-screen bg-slate-950 text-slate-100 selection:bg-brand-500 selection:text-white">
+    <html lang="en" className={manrope.variable}>
+      <body className="antialiased min-h-screen bg-[#fbfcfe] text-slate-900 font-sans selection:bg-brand-500 selection:text-white">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -13,6 +13,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const { login, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -28,15 +29,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isRegister) {
-        const res = await register(email, password, role, role === 'merchant' ? businessName : undefined);
+        if (!name.trim()) {
+          setError('Name is required');
+          setLoading(false);
+          return;
+        }
+        if (!email.trim()) {
+          setError('Email is required');
+          setLoading(false);
+          return;
+        }
+        if (!password.trim()) {
+          setError('Password is required');
+          setLoading(false);
+          return;
+        }
+
+        const res = await register(
+          name.trim(),
+          email.trim(),
+          password,
+          role,
+          role === 'merchant' ? businessName.trim() : undefined
+        );
+
         if (res.success) {
+          setName('');
+          setEmail('');
+          setPassword('');
+          setBusinessName('');
           onClose();
         } else {
           setError(res.message || 'Registration failed');
         }
       } else {
-        const res = await login(email, password);
+        if (!email.trim() || !password.trim()) {
+          setError('Email and password are required');
+          setLoading(false);
+          return;
+        }
+
+        const res = await login(email.trim(), password);
         if (res.success) {
+          setEmail('');
+          setPassword('');
           onClose();
         } else {
           setError(res.message || 'Login failed');
@@ -49,10 +85,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleDemoFill = (demoRole: 'customer' | 'merchant') => {
     if (demoRole === 'customer') {
+      setName('Demo Buyer');
       setEmail('buyer@example.com');
       setPassword('password123');
       setRole('customer');
     } else {
+      setName('Demo Merchant');
       setEmail('merchant@store.com');
       setPassword('password123');
       setRole('merchant');
@@ -62,135 +100,147 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
+      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-900/50">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center border border-brand-500/20">
-              <ShieldCheck className="w-4 h-4" />
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center border border-brand-200/60 shadow-2xs">
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">
+              <h2 className="text-base font-bold text-slate-900">
                 {isRegister ? 'Create Account' : 'Welcome Back'}
               </h2>
-              <p className="text-xs text-slate-400">
-                {isRegister ? 'Join SellPilot AI Platform' : 'Sign in to access your dashboard'}
+              <p className="text-xs text-slate-500">
+                {isRegister ? 'Join SellPilot AI Platform' : 'Sign in to access your commerce account'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Demo Fill Switchers */}
-        <div className="p-4 bg-slate-950/50 border-b border-slate-800/80 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-medium text-slate-400">Quick Demo Fill:</span>
+        <div className="p-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Quick Fill:</span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => handleDemoFill('customer')}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1"
+              className="px-3 py-1 rounded-full text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-colors flex items-center gap-1.5"
             >
-              <User className="w-3 h-3 text-brand-400" /> Buyer
+              <User className="w-3.5 h-3.5 text-brand-600" /> Buyer
             </button>
             <button
               type="button"
               onClick={() => handleDemoFill('merchant')}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1"
+              className="px-3 py-1 rounded-full text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-colors flex items-center gap-1.5"
             >
-              <Store className="w-3 h-3 text-emerald-400" /> Merchant
+              <Store className="w-3.5 h-3.5 text-brand-600" /> Merchant
             </button>
           </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
               {error}
             </div>
           )}
 
           {isRegister && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setRole('customer')}
-                className={`py-1.5 text-xs font-medium rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
-                  role === 'customer'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Customer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('merchant')}
-                className={`py-1.5 text-xs font-medium rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
-                  role === 'merchant'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span>Merchant</span>
-              </button>
-            </div>
-          )}
+            <>
+              {/* Role Toggle */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Account Role</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setRole('customer')}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all ${
+                      role === 'customer'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5 text-brand-600" />
+                    <span>Customer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('merchant')}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all ${
+                      role === 'merchant'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Store className="w-3.5 h-3.5 text-brand-600" />
+                    <span>Merchant</span>
+                  </button>
+                </div>
+              </div>
 
-          {isRegister && role === 'merchant' && (
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Business Name
-              </label>
-              <div className="relative">
-                <Store className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Full Name</label>
                 <input
                   type="text"
                   required
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="e.g. Apex Sports Gear"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Vikram Mehta"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 font-medium"
                 />
               </div>
-            </div>
+
+              {role === 'merchant' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Business / Store Name</label>
+                  <input
+                    type="text"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="e.g. UrbanStyle Footwear"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 font-medium"
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
+            <div className="relative flex items-center">
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 font-medium"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
+            <div className="relative flex items-center">
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 font-medium"
               />
             </div>
           </div>
@@ -198,27 +248,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+            className="w-full py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-95 mt-2"
           >
-            <span>{loading ? 'Processing...' : isRegister ? 'Register Account' : 'Sign In'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>{loading ? 'Authenticating...' : isRegister ? 'Create Account' : 'Sign In'}</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
-
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegister(!isRegister);
-                setError(null);
-              }}
-              className="text-xs text-slate-400 hover:text-brand-400 transition-colors"
-            >
-              {isRegister
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Create one"}
-            </button>
-          </div>
         </form>
+
+        {/* Footer Toggle */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-center text-xs text-slate-500">
+          {isRegister ? (
+            <span>
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegister(false);
+                  setError(null);
+                }}
+                className="font-bold text-slate-900 hover:underline"
+              >
+                Sign In
+              </button>
+            </span>
+          ) : (
+            <span>
+              Don&apos;t have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegister(true);
+                  setError(null);
+                }}
+                className="font-bold text-slate-900 hover:underline"
+              >
+                Create Account
+              </button>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

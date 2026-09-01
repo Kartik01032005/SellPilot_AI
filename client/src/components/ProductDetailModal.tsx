@@ -3,7 +3,7 @@
 import React from 'react';
 import { ProductItem } from './ProductCard';
 import { useCart } from '@/context/CartContext';
-import { X, ShoppingCart, Sparkles, CheckCircle2, ShieldCheck, Tag, Layers } from 'lucide-react';
+import { X, ShoppingCart, Sparkles, CheckCircle2, ShieldCheck, Tag } from 'lucide-react';
 
 interface ProductDetailModalProps {
   product: ProductItem | null;
@@ -34,62 +34,62 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
+      <div className="w-full max-w-lg bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 flex items-start justify-between bg-slate-950/40">
+        <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-semibold uppercase px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <span className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
                 {product.category}
               </span>
               <span
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                   isOutOfStock
-                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 }`}
               >
-                {isOutOfStock ? 'Out of Stock' : `${product.stock} units available`}
+                {isOutOfStock ? 'Out of Stock' : `${product.stock} in stock`}
               </span>
             </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">{product.name}</h2>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">{product.name}</h2>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-600 text-xs">
           {/* Description */}
           <div>
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               Product Overview
             </h4>
-            <p className="text-sm text-slate-300 leading-relaxed">
+            <p className="text-sm text-slate-600 leading-relaxed font-medium">
               {product.description ||
-                'High performance product rigorously tested for quality, durability, and commercial compliance.'}
+                'High performance catalog product certified for authentic quality and verified commerce.'}
             </p>
           </div>
 
           {/* Key Features */}
           {product.features && product.features.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-brand-400" /> Key Features
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-brand-600" /> Key Features
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {product.features.map((feat, idx) => (
                   <div
                     key={idx}
-                    className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center space-x-2 text-xs text-slate-300"
+                    className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center space-x-2 text-xs text-slate-700 font-medium"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>{feat}</span>
                   </div>
                 ))}
@@ -98,31 +98,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           )}
 
           {/* Price & Safety Assurance */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-950/40 via-slate-900 to-indigo-950/40 border border-brand-500/20 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-50/60 via-slate-50 to-indigo-50/60 border border-brand-100 flex items-center justify-between">
             <div>
-              <span className="text-xs text-slate-400 block font-medium">Server-Verified Price</span>
-              <span className="text-2xl font-extrabold text-white">
+              <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">Verified Price</span>
+              <span className="text-2xl font-black text-slate-900">
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
             </div>
-            <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-medium">
-              <ShieldCheck className="w-4 h-4" />
+            <div className="flex items-center space-x-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-full">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Razorpay Verified</span>
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3">
+        <div className="p-5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => {
               onAskAI(product);
               onClose();
             }}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-brand-300 text-xs font-semibold flex items-center space-x-2 transition-colors"
+            className="px-4 py-2.5 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-brand-700 text-xs font-semibold flex items-center space-x-2 transition-colors shadow-2xs"
           >
-            <Sparkles className="w-4 h-4 text-brand-400" />
+            <Sparkles className="w-4 h-4 text-brand-600" />
             <span>Ask SellPilot AI</span>
           </button>
 
@@ -130,16 +130,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             type="button"
             disabled={isOutOfStock}
             onClick={handleAddToCart}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition-all ${
+            className={`px-5 py-2.5 rounded-full text-xs font-bold flex items-center space-x-2 transition-all shadow-sm ${
               isOutOfStock
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                 : inCart
-                ? 'bg-emerald-600 text-white shadow'
-                : 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/20 active:scale-95'
+                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                : 'bg-slate-900 hover:bg-slate-800 text-white active:scale-95'
             }`}
           >
             <ShoppingCart className="w-4 h-4" />
-            <span>{inCart ? 'In Cart' : 'Add to Cart'}</span>
+            <span>{inCart ? 'Added to Cart' : 'Add to Cart'}</span>
           </button>
         </div>
       </div>

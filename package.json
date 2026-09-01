@@ -4,6 +4,7 @@
   "description": "SellPilot AI — AI Growth & Agentic Commerce Platform (Razorpay Track 01)",
   "private": true,
   "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue.bold,green.bold\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "build:server": "npm --prefix server run build",
@@ -14,6 +15,9 @@
     "lint:client": "npm --prefix client run lint",
     "test:server": "npm --prefix server run test",
     "test": "npm run test:server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   },
   "keywords": [
     "sellpilot",

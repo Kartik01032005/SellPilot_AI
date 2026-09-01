@@ -6,7 +6,6 @@ const router = Router();
 
 // POST /api/ai/chat - Optional authentication so guests can browse products while logged in users get full history
 router.post('/chat', (req, res, next) => {
-  // If authorization header is provided, run authenticateToken
   if (req.headers.authorization) {
     return authenticateToken(req as any, res, next);
   }
@@ -15,5 +14,16 @@ router.post('/chat', (req, res, next) => {
 
 // POST /api/ai/intent
 router.post('/intent', AIController.detectIntent);
+
+// GET /api/ai/tools - List all registered agent tools
+router.get('/tools', AIController.getTools);
+
+// POST /api/ai/tools/execute - Execute a specific agent tool
+router.post('/tools/execute', (req, res, next) => {
+  if (req.headers.authorization) {
+    return authenticateToken(req as any, res, next);
+  }
+  next();
+}, AIController.executeTool);
 
 export default router;

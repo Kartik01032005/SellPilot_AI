@@ -10,17 +10,11 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  AlertTriangle,
   Layers,
   Percent,
   Play,
   ShieldCheck,
   RefreshCw,
-  Eye,
-  Store,
-  DollarSign,
-  Tag,
-  Clock,
   History,
   X,
 } from 'lucide-react';
@@ -45,7 +39,6 @@ export const MerchantDashboard: React.FC = () => {
 
   // Campaigns State
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [isCreateCampaignOpen, setIsCreateCampaignOpen] = useState(false);
   const [campName, setCampName] = useState('');
   const [campDiscount, setCampDiscount] = useState('');
@@ -54,7 +47,6 @@ export const MerchantDashboard: React.FC = () => {
 
   // Audit Logs State
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
 
   const fetchInsights = async () => {
     setInsightsLoading(true);
@@ -88,7 +80,6 @@ export const MerchantDashboard: React.FC = () => {
   };
 
   const fetchCampaigns = async () => {
-    setCampaignsLoading(true);
     try {
       const res = await ApiClient.request<{ success: boolean; campaigns: any[] }>('/api/campaigns');
       if (res.success && res.campaigns) {
@@ -96,13 +87,10 @@ export const MerchantDashboard: React.FC = () => {
       }
     } catch {
       // Ignore
-    } finally {
-      setCampaignsLoading(false);
     }
   };
 
   const fetchAuditLogs = async () => {
-    setAuditLoading(true);
     try {
       const res = await ApiClient.request<{ success: boolean; logs: any[] }>('/api/audit');
       if (res.success && res.logs) {
@@ -110,8 +98,6 @@ export const MerchantDashboard: React.FC = () => {
       }
     } catch {
       // Ignore
-    } finally {
-      setAuditLoading(false);
     }
   };
 
@@ -145,7 +131,7 @@ export const MerchantDashboard: React.FC = () => {
         fetchProducts();
         fetchInsights();
       }
-    } catch (err) {
+    } catch {
       alert('Error creating product');
     }
   };
@@ -160,7 +146,7 @@ export const MerchantDashboard: React.FC = () => {
         fetchProducts();
         fetchInsights();
       }
-    } catch (err) {
+    } catch {
       alert('Error deleting product');
     }
   };
@@ -205,7 +191,7 @@ export const MerchantDashboard: React.FC = () => {
       } else {
         alert(res.message || 'Campaign creation failed');
       }
-    } catch (err) {
+    } catch {
       alert('Error creating campaign');
     }
   };
@@ -219,7 +205,7 @@ export const MerchantDashboard: React.FC = () => {
         fetchCampaigns();
         fetchAuditLogs();
       }
-    } catch (err) {
+    } catch {
       alert('Error approving campaign');
     }
   };
@@ -236,71 +222,71 @@ export const MerchantDashboard: React.FC = () => {
       } else {
         alert(res.message || 'Activation failed');
       }
-    } catch (err) {
+    } catch {
       alert('Error activating campaign');
     }
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 font-sans">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">Merchant Growth Hub</h1>
-            <span className="text-xs font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <div className="flex items-center space-x-2.5">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Merchant Growth Hub</h1>
+            <span className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
               Gated & Bounded
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Data-driven growth, promotion analytics, and safe campaign controls.
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Data-driven revenue growth, autonomous opportunity discovery, and discount limit guardrails.
           </p>
         </div>
 
-        {/* Sub Navigation */}
-        <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
+        {/* Sub Navigation (Pill Style) */}
+        <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200">
           <button
             onClick={() => setActiveTab('insights')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'insights'
-                ? 'bg-brand-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <TrendingUp className="w-3.5 h-3.5" />
+            <TrendingUp className="w-3.5 h-3.5 text-brand-600" />
             <span>Growth Insights</span>
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'products'
-                ? 'bg-brand-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Package className="w-3.5 h-3.5" />
+            <Package className="w-3.5 h-3.5 text-brand-600" />
             <span>Catalog ({products.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('campaigns')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'campaigns'
-                ? 'bg-brand-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Percent className="w-3.5 h-3.5" />
+            <Percent className="w-3.5 h-3.5 text-brand-600" />
             <span>Campaigns ({campaigns.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'audit'
-                ? 'bg-brand-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <History className="w-3.5 h-3.5" />
+            <History className="w-3.5 h-3.5 text-brand-600" />
             <span>Audit Trail</span>
           </button>
         </div>
@@ -310,12 +296,12 @@ export const MerchantDashboard: React.FC = () => {
       {activeTab === 'insights' && (
         <div className="space-y-6">
           {insightsLoading ? (
-            <div className="p-12 text-center text-slate-400">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-brand-400 mb-2" />
-              <p className="text-xs">Computing merchant growth insights from catalog data...</p>
+            <div className="p-12 text-center text-slate-500 bg-white rounded-3xl border border-slate-200 shadow-soft">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-brand-600 mb-2" />
+              <p className="text-xs font-bold">Computing merchant growth insights from live catalog data...</p>
             </div>
           ) : !insights ? (
-            <div className="p-10 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-slate-400">
+            <div className="p-10 rounded-3xl bg-white border border-slate-200 text-center text-slate-500 shadow-soft">
               No growth metrics recorded yet.
             </div>
           ) : (
@@ -323,43 +309,43 @@ export const MerchantDashboard: React.FC = () => {
               {/* Top 3 Metric Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* Promotion Opportunities */}
-                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-brand-500/40 transition-all duration-200 space-y-3 shadow-sm">
-                  <div className="flex items-center space-x-2 text-brand-400">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 hover:border-brand-300 transition-all duration-200 space-y-3 shadow-soft">
+                  <div className="flex items-center space-x-2 text-brand-600 font-bold">
                     <Sparkles className="w-4 h-4" />
-                    <h3 className="font-bold text-sm text-white">Promotion Opportunities</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Promotion Opportunities</h3>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    High inventory items with strong sales potential.
+                  <p className="text-xs text-slate-500 font-medium">
+                    High inventory items with strong sales velocity potential.
                   </p>
                   <div className="space-y-2 pt-2">
                     {insights.promotionOpportunities?.length > 0 ? (
                       insights.promotionOpportunities.map((op: any, i: number) => (
                         <div
                           key={i}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 hover:border-brand-500/30 transition-colors"
+                          className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 hover:border-brand-200 transition-colors"
                         >
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-xs text-white">{op.name}</span>
-                            <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                            <span className="font-bold text-xs text-slate-900">{op.name}</span>
+                            <span className="text-[10px] text-emerald-700 font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
                               {op.suggestedDiscount}% Discount
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-snug">{op.reason}</p>
+                          <p className="text-[11px] text-slate-600 leading-snug font-medium">{op.reason}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-500">Inventory is balanced.</p>
+                      <p className="text-xs text-slate-400">Inventory is balanced.</p>
                     )}
                   </div>
                 </div>
 
                 {/* Cross-Sell Recommendations */}
-                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/40 transition-all duration-200 space-y-3 shadow-sm">
-                  <div className="flex items-center space-x-2 text-indigo-400">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 hover:border-indigo-300 transition-all duration-200 space-y-3 shadow-soft">
+                  <div className="flex items-center space-x-2 text-indigo-600 font-bold">
                     <Layers className="w-4 h-4" />
-                    <h3 className="font-bold text-sm text-white">Cross-Sell Bundles</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Cross-Sell Bundles</h3>
                   </div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 font-medium">
                     High affinity complementary product pairings.
                   </p>
                   <div className="space-y-2 pt-2">
@@ -367,29 +353,29 @@ export const MerchantDashboard: React.FC = () => {
                       insights.crossSellOpportunities.map((cs: any, i: number) => (
                         <div
                           key={i}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 hover:border-indigo-500/30 transition-colors"
+                          className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 hover:border-indigo-200 transition-colors"
                         >
-                          <div className="font-bold text-xs text-white">
+                          <div className="font-bold text-xs text-slate-900">
                             {cs.primaryName || cs.name} + {cs.relatedName}
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-snug">
+                          <p className="text-[11px] text-slate-600 leading-snug font-medium">
                             {cs.reason || 'Recommended accessory pairing'}
                           </p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-500">No cross-sells configured.</p>
+                      <p className="text-xs text-slate-400">No cross-sells configured.</p>
                     )}
                   </div>
                 </div>
 
                 {/* Upsell Opportunities */}
-                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-amber-500/40 transition-all duration-200 space-y-3 shadow-sm">
-                  <div className="flex items-center space-x-2 text-amber-400">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 hover:border-amber-300 transition-all duration-200 space-y-3 shadow-soft">
+                  <div className="flex items-center space-x-2 text-amber-600 font-bold">
                     <TrendingUp className="w-4 h-4" />
-                    <h3 className="font-bold text-sm text-white">Value Upsell Paths</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Value Upsell Paths</h3>
                   </div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 font-medium">
                     Premium alternatives to increase average order value.
                   </p>
                   <div className="space-y-2 pt-2">
@@ -397,19 +383,19 @@ export const MerchantDashboard: React.FC = () => {
                       insights.upsellOpportunities.map((us: any, i: number) => (
                         <div
                           key={i}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 hover:border-amber-500/30 transition-colors"
+                          className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 hover:border-amber-200 transition-colors"
                         >
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-xs text-white">{us.name} → {us.premiumName}</span>
-                            <span className="text-[10px] text-amber-400 font-bold">
+                            <span className="font-bold text-xs text-slate-900">{us.name} → {us.premiumName}</span>
+                            <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                               +₹{us.priceDiff}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-snug">{us.reason}</p>
+                          <p className="text-[11px] text-slate-600 leading-snug font-medium">{us.reason}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-500">No upsell paths identified.</p>
+                      <p className="text-xs text-slate-400">No upsell paths identified.</p>
                     )}
                   </div>
                 </div>
@@ -418,53 +404,53 @@ export const MerchantDashboard: React.FC = () => {
               {/* Bottom Row: Top Performers & Guardrails */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Top Performing Catalog Items */}
-                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-emerald-400">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 space-y-3 shadow-soft">
+                  <div className="flex items-center space-x-2 text-emerald-600 font-bold">
                     <CheckCircle2 className="w-4 h-4" />
-                    <h3 className="font-bold text-sm text-white">Top Performing Products</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Top Performing Products</h3>
                   </div>
                   <div className="space-y-2">
                     {insights.topProducts?.length > 0 ? (
                       insights.topProducts.map((tp: any, i: number) => (
                         <div
                           key={i}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center text-xs"
+                          className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs"
                         >
                           <div>
-                            <span className="font-bold text-white block">{tp.name}</span>
-                            <span className="text-[11px] text-slate-400">{tp.category} • {tp.stock} in stock</span>
+                            <span className="font-bold text-slate-900 block">{tp.name}</span>
+                            <span className="text-[11px] text-slate-500 font-medium">{tp.category} • {tp.stock} in stock</span>
                           </div>
-                          <span className="font-extrabold text-white">₹{tp.price?.toLocaleString('en-IN')}</span>
+                          <span className="font-black text-slate-900">₹{tp.price?.toLocaleString('en-IN')}</span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-500">No active products.</p>
+                      <p className="text-xs text-slate-400">No active products.</p>
                     )}
                   </div>
                 </div>
 
                 {/* Guardrails */}
-                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-brand-400">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200/90 space-y-3 shadow-soft">
+                  <div className="flex items-center space-x-2 text-brand-600 font-bold">
                     <ShieldCheck className="w-4 h-4" />
-                    <h3 className="font-bold text-sm text-white">Configured Merchant Guardrails</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Configured Merchant Guardrails</h3>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Max Discount Limit:</span>
-                      <strong className="text-white">25% (Server Enforced)</strong>
+                      <span className="text-slate-500 font-medium">Max Discount Limit:</span>
+                      <strong className="text-slate-900 font-bold">25% (Server Enforced)</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Campaign Approval:</span>
-                      <strong className="text-emerald-400">Mandatory Gate</strong>
+                      <span className="text-slate-500 font-medium">Campaign Approval:</span>
+                      <strong className="text-emerald-700 font-bold">Mandatory Gate</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Financial Execution:</span>
-                      <strong className="text-white">HMAC-SHA256 Verified</strong>
+                      <span className="text-slate-500 font-medium">Financial Execution:</span>
+                      <strong className="text-slate-900 font-bold">HMAC-SHA256 Verified</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Audit Ledger:</span>
-                      <strong className="text-brand-400">Immutable Logging</strong>
+                      <span className="text-slate-500 font-medium">Audit Ledger:</span>
+                      <strong className="text-brand-600 font-bold">Immutable Logging</strong>
                     </div>
                   </div>
                 </div>
@@ -478,12 +464,12 @@ export const MerchantDashboard: React.FC = () => {
       {activeTab === 'products' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-white">Merchant Products</h3>
+            <h3 className="text-sm font-bold text-slate-900">Merchant Products</h3>
             <button
               onClick={() => setIsAddProductOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center space-x-1 shadow-sm"
+              className="px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 text-brand-300" />
               <span>Add Product</span>
             </button>
           </div>
@@ -495,32 +481,32 @@ export const MerchantDashboard: React.FC = () => {
               {products.map((p) => (
                 <div
                   key={p._id}
-                  className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between"
+                  className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-soft hover:shadow-hover transition-all flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] uppercase font-bold text-brand-400">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-[10px] uppercase font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200/60">
                         {p.category}
                       </span>
                       <button
                         onClick={() => handleDeleteProduct(p._id)}
-                        className="text-slate-500 hover:text-rose-400 p-1"
+                        className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
                         title="Delete product"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <h4 className="text-xs font-bold text-white truncate">{p.name}</h4>
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                    <h4 className="text-xs font-bold text-slate-900 truncate">{p.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 font-medium">
                       {p.description || 'Verified catalog item.'}
                     </p>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                    <span className="font-extrabold text-white">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                    <span className="font-black text-slate-900">
                       ₹{p.price.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-slate-400">{p.stock} in stock</span>
+                    <span className="text-slate-500 font-medium">{p.stock} in stock</span>
                   </div>
                 </div>
               ))}
@@ -534,14 +520,14 @@ export const MerchantDashboard: React.FC = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-sm font-bold text-white">Marketing Campaigns</h3>
-              <p className="text-xs text-slate-400">All campaigns require explicit approval before activation.</p>
+              <h3 className="text-sm font-bold text-slate-900">Marketing Campaigns</h3>
+              <p className="text-xs text-slate-500 font-medium">All campaigns require explicit approval before activation.</p>
             </div>
             <button
               onClick={() => setIsCreateCampaignOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center space-x-1 shadow-sm"
+              className="px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 text-brand-300" />
               <span>Create Campaign</span>
             </button>
           </div>
@@ -550,26 +536,26 @@ export const MerchantDashboard: React.FC = () => {
             {campaigns.map((camp) => (
               <div
                 key={camp._id}
-                className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-4"
+                className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-soft flex flex-wrap items-center justify-between gap-4"
               >
                 <div>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xs font-bold text-white">{camp.name}</span>
+                    <span className="text-xs font-bold text-slate-900">{camp.name}</span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
                         camp.status === 'active'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : camp.status === 'approved'
-                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-200'
                       }`}
                     >
                       {camp.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Discount: <strong className="text-white">{camp.discountPercentage}%</strong> | 
-                    Approvable: <strong className="text-white">{camp.isApproved ? 'Yes' : 'Pending'}</strong>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Discount: <strong className="text-slate-900 font-bold">{camp.discountPercentage}%</strong> | 
+                    Approval Status: <strong className="text-slate-900 font-bold">{camp.isApproved ? 'Approved' : 'Pending'}</strong>
                   </p>
                 </div>
 
@@ -578,7 +564,7 @@ export const MerchantDashboard: React.FC = () => {
                   {!camp.isApproved && camp.status !== 'active' && (
                     <button
                       onClick={() => handleApproveCampaign(camp._id)}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-bold flex items-center space-x-1 transition-all"
+                      className="px-3.5 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center space-x-1 transition-all"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Approve Campaign</span>
@@ -588,7 +574,7 @@ export const MerchantDashboard: React.FC = () => {
                   {camp.isApproved && camp.status !== 'active' && (
                     <button
                       onClick={() => handleActivateCampaign(camp._id)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold flex items-center space-x-1 transition-all"
+                      className="px-3.5 py-1.5 rounded-full bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center space-x-1 transition-all"
                     >
                       <Play className="w-3.5 h-3.5" />
                       <span>Activate</span>
@@ -596,7 +582,7 @@ export const MerchantDashboard: React.FC = () => {
                   )}
 
                   {camp.status === 'active' && (
-                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="text-xs text-emerald-700 font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-4 h-4" /> Live & Verified
                     </span>
                   )}
@@ -611,36 +597,36 @@ export const MerchantDashboard: React.FC = () => {
       {activeTab === 'audit' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-white">Auditable Commerce Ledger</h3>
+            <h3 className="text-sm font-bold text-slate-900">Auditable Commerce Ledger</h3>
             <button
               onClick={fetchAuditLogs}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+              className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="overflow-x-auto rounded-3xl border border-slate-200/80 bg-white shadow-soft">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 border-b border-slate-800 text-slate-400 font-semibold">
+              <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-semibold">
                 <tr>
-                  <th className="p-3">Action</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Entity Reference</th>
-                  <th className="p-3">Timestamp</th>
+                  <th className="p-3.5">Action</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5">Entity Reference</th>
+                  <th className="p-3.5">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {auditLogs.map((log) => (
-                  <tr key={log._id} className="hover:bg-slate-800/30">
-                    <td className="p-3 font-mono text-brand-300">{log.action}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                  <tr key={log._id} className="hover:bg-slate-50/50">
+                    <td className="p-3.5 font-mono font-bold text-slate-900">{log.action}</td>
+                    <td className="p-3.5">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                         {log.status}
                       </span>
                     </td>
-                    <td className="p-3 font-mono text-slate-400">{log.entityId || '-'}</td>
-                    <td className="p-3 text-slate-500">
+                    <td className="p-3.5 font-mono text-slate-500">{log.entityId || '-'}</td>
+                    <td className="p-3.5 text-slate-400 font-mono">
                       {new Date(log.createdAt).toLocaleTimeString()}
                     </td>
                   </tr>
@@ -653,32 +639,32 @@ export const MerchantDashboard: React.FC = () => {
 
       {/* Modal: Add Product */}
       {isAddProductOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-white text-base">Add New Product</h3>
-              <button onClick={() => setIsAddProductOpen(false)} className="text-slate-400 hover:text-white">
+              <h3 className="font-bold text-slate-900 text-base">Add New Product</h3>
+              <button onClick={() => setIsAddProductOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCreateProduct} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Product Name</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Product Name</label>
                 <input
                   required
                   value={newProdName}
                   onChange={(e) => setNewProdName(e.target.value)}
                   placeholder="e.g. Ultra Carbon Running Shoes"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Category</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Category</label>
                   <select
                     value={newProdCategory}
                     onChange={(e) => setNewProdCategory(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                   >
                     <option value="Shoes">Shoes</option>
                     <option value="Laptops">Laptops</option>
@@ -689,40 +675,40 @@ export const MerchantDashboard: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Price (₹)</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Price (₹)</label>
                   <input
                     type="number"
                     required
                     value={newProdPrice}
                     onChange={(e) => setNewProdPrice(e.target.value)}
                     placeholder="2999"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Initial Stock</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Initial Stock</label>
                 <input
                   type="number"
                   required
                   value={newProdStock}
                   onChange={(e) => setNewProdStock(e.target.value)}
                   placeholder="10"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Features (comma separated)</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Features (comma separated)</label>
                 <input
                   value={newProdFeatures}
                   onChange={(e) => setNewProdFeatures(e.target.value)}
                   placeholder="lightweight, breathable, carbon-plate"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow mt-3"
+                className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm mt-3 active:scale-95 transition-all"
               >
                 Publish Product
               </button>
@@ -733,27 +719,27 @@ export const MerchantDashboard: React.FC = () => {
 
       {/* Modal: Create Campaign */}
       {isCreateCampaignOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-white text-base">Create Marketing Campaign</h3>
-              <button onClick={() => setIsCreateCampaignOpen(false)} className="text-slate-400 hover:text-white">
+              <h3 className="font-bold text-slate-900 text-base">Create Marketing Campaign</h3>
+              <button onClick={() => setIsCreateCampaignOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCreateCampaign} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Campaign Name</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Campaign Name</label>
                 <input
                   required
                   value={campName}
                   onChange={(e) => setCampName(e.target.value)}
                   placeholder="e.g. Flash Summer Promo"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Discount Percentage (%)</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Discount Percentage (%)</label>
                 <input
                   type="number"
                   required
@@ -763,12 +749,12 @@ export const MerchantDashboard: React.FC = () => {
                     if (e.target.value) handleValidateDiscount(Number(e.target.value));
                   }}
                   placeholder="15"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 />
                 {discountValidationMsg && (
                   <p
-                    className={`text-[11px] mt-1 ${
-                      discountValidationMsg.valid ? 'text-emerald-400' : 'text-rose-400'
+                    className={`text-[11px] mt-1 font-bold ${
+                      discountValidationMsg.valid ? 'text-emerald-700' : 'text-rose-600'
                     }`}
                   >
                     {discountValidationMsg.message}
@@ -776,11 +762,11 @@ export const MerchantDashboard: React.FC = () => {
                 )}
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Target Product (Optional)</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Target Product (Optional)</label>
                 <select
                   value={campProduct}
                   onChange={(e) => setCampProduct(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 font-medium"
                 >
                   <option value="">All Products</option>
                   {products.map((p) => (
@@ -792,7 +778,7 @@ export const MerchantDashboard: React.FC = () => {
               </div>
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow mt-3"
+                className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm mt-3 active:scale-95 transition-all"
               >
                 Submit for Approval
               </button>

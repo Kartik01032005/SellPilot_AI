@@ -9,14 +9,10 @@ import {
   X,
   Send,
   Bot,
-  User,
-  Sparkles,
-  Store,
   Compass,
+  Store,
   ShoppingCart,
-  ArrowRight,
   TrendingUp,
-  AlertTriangle,
   CheckCircle2,
   RefreshCw,
 } from 'lucide-react';
@@ -80,17 +76,17 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
 
   // Initialize initial greeting when opened
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
+    if (isOpen) {
       const initialGreeting: ChatMessage = {
         id: 'msg_welcome',
         sender: 'agent',
         text:
           mode === 'buyer'
-            ? 'Hello! I am SellPilot AI. Tell me what you are looking for, your budget, or specific features, and I will find verified catalog options for you.'
-            : 'Welcome to SellPilot Merchant Hub. Ask me about product performance, promotion opportunities, upsells, or campaign ideas.',
+            ? 'Hello! I am SellPilot AI. Tell me what product you are looking for, your budget, or desired features, and I will match verified catalog products with price bounds.'
+            : 'Welcome to SellPilot Merchant Hub. Ask me about product performance, promotion opportunities, upsells, or campaign discount ideas.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages([initialGreeting]);
+      setMessages((prev) => (prev.length === 0 ? [initialGreeting] : prev));
     }
   }, [isOpen, mode]);
 
@@ -182,7 +178,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         };
         setMessages((prev) => [...prev, errorMsg]);
       }
-    } catch (err) {
+    } catch {
       const errorMsg: ChatMessage = {
         id: `agt_err_${Date.now()}`,
         sender: 'agent',
@@ -196,22 +192,22 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] max-h-[780px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
+      <div className="w-full max-w-3xl bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] max-h-[780px]">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20 text-white">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-md shadow-brand-500/20 text-white">
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-bold text-sm sm:text-base text-white">SellPilot AI Assistant</h3>
-                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                <h3 className="font-bold text-sm sm:text-base text-slate-900">SellPilot AI Assistant</h3>
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
                   Agentic Commerce
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 font-medium">
                 Language: {languageNames[language]?.label || 'English'}
               </p>
             </div>
@@ -219,29 +215,29 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
 
           <div className="flex items-center space-x-2">
             {/* Mode Switcher */}
-            <div className="flex bg-slate-950 border border-slate-800 rounded-xl p-1">
+            <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200/80">
               <button
                 type="button"
                 onClick={() => setMode('buyer')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1 transition-all ${
+                className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
                   mode === 'buyer'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Compass className="w-3 h-3" />
+                <Compass className="w-3 h-3 text-brand-600" />
                 <span>Buyer</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMode('merchant')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1 transition-all ${
+                className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
                   mode === 'merchant'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Store className="w-3 h-3" />
+                <Store className="w-3 h-3 text-brand-600" />
                 <span>Merchant</span>
               </button>
             </div>
@@ -249,7 +245,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             <button
               onClick={onClose}
               aria-label="Close"
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -257,7 +253,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         </div>
 
         {/* Messages Feed */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-slate-950/30">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-[#fbfcfe]">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -266,38 +262,38 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
               <div
                 className={`max-w-[88%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-brand-600 text-white rounded-br-none shadow-md shadow-brand-500/10'
-                    : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none shadow-sm'
+                    ? 'bg-slate-900 text-white rounded-br-none shadow-sm'
+                    : 'bg-white border border-slate-200/90 text-slate-800 rounded-bl-none shadow-soft'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.text}</p>
 
                 {/* Structured Products Output from AI */}
                 {msg.products && msg.products.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2.5">
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                       Recommended Verified Products
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {msg.products.map((p) => (
                         <div
                           key={p.id}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-brand-500/40 transition-all flex flex-col justify-between"
+                          className="p-3 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-brand-300 transition-all flex flex-col justify-between"
                         >
                           <div>
                             <div className="flex justify-between items-start gap-1">
-                              <span className="text-[10px] font-bold text-brand-400 uppercase">
+                              <span className="text-[10px] font-bold text-brand-700 uppercase">
                                 {p.category}
                               </span>
-                              <span className="text-xs font-extrabold text-white">
+                              <span className="text-xs font-black text-slate-900">
                                 ₹{p.price.toLocaleString('en-IN')}
                               </span>
                             </div>
-                            <h5 className="font-bold text-xs text-white mt-1 line-clamp-1">
+                            <h5 className="font-bold text-xs text-slate-900 mt-1 line-clamp-1">
                               {p.name}
                             </h5>
                             {p.reason && (
-                              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                              <p className="text-[11px] text-slate-500 mt-1 leading-snug font-medium">
                                 {p.reason}
                               </p>
                             )}
@@ -312,7 +308,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                                 category: p.category,
                               })
                             }
-                            className="mt-3 w-full py-1.5 rounded-lg bg-brand-600/20 hover:bg-brand-600 text-brand-300 hover:text-white border border-brand-500/30 text-[11px] font-bold flex items-center justify-center space-x-1 transition-all"
+                            className="mt-3 w-full py-1.5 rounded-full bg-white hover:bg-slate-900 text-slate-800 hover:text-white border border-slate-200 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition-all shadow-2xs"
                           >
                             <ShoppingCart className="w-3 h-3" />
                             <span>Add to Cart</span>
@@ -325,14 +321,14 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
 
                 {/* Upsell Card */}
                 {msg.upsell && (
-                  <div className="mt-3 p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs">
-                    <div className="flex items-center space-x-1.5 text-indigo-300 font-bold mb-1">
-                      <TrendingUp className="w-3.5 h-3.5" />
+                  <div className="mt-3 p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 text-xs">
+                    <div className="flex items-center space-x-1.5 text-indigo-700 font-bold mb-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
                       <span>Value Upsell Suggestion</span>
                     </div>
-                    <p className="text-slate-300 text-[11px]">{msg.upsell.reason}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">
+                    <p className="text-slate-600 text-[11px] font-medium">{msg.upsell.reason}</p>
+                    <div className="mt-2.5 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">
                         {msg.upsell.name} (₹{msg.upsell.price.toLocaleString('en-IN')})
                       </span>
                       <button
@@ -344,7 +340,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                             price: msg.upsell!.price,
                           })
                         }
-                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-colors"
+                        className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-2xs transition-colors"
                       >
                         Add Upgrade
                       </button>
@@ -361,7 +357,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                         onClose();
                         onOpenCheckout();
                       }}
-                      className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center justify-center space-x-1.5 transition-all"
+                      className="w-full py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 transition-all"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Proceed to Verified Checkout</span>
@@ -369,27 +365,27 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                   </div>
                 )}
               </div>
-              <span className="text-[10px] text-slate-500 mt-1 px-1">{msg.timestamp}</span>
+              <span className="text-[10px] text-slate-400 mt-1 px-1 font-mono">{msg.timestamp}</span>
             </div>
           ))}
 
           {loading && (
-            <div className="flex items-center space-x-2 text-xs text-brand-400 bg-slate-900 border border-slate-800 p-3 rounded-2xl max-w-[200px]">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Analyzing catalog...</span>
+            <div className="flex items-center space-x-2 text-xs text-brand-700 bg-brand-50 border border-brand-200/80 p-3 rounded-2xl max-w-[210px]">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-600" />
+              <span className="font-semibold">Analyzing verified catalog...</span>
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
 
         {/* Prompt Suggestions */}
-        <div className="p-3 bg-slate-950/80 border-t border-slate-800 overflow-x-auto flex gap-1.5 no-scrollbar">
+        <div className="p-3 bg-slate-50/80 border-t border-slate-100 overflow-x-auto flex gap-1.5 no-scrollbar">
           {activeChips.map((chip, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => handleSendMessage(chip)}
-              className="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="px-3 py-1 rounded-full text-[11px] whitespace-nowrap bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors shadow-2xs font-semibold"
             >
               {chip}
             </button>
@@ -402,7 +398,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             e.preventDefault();
             handleSendMessage();
           }}
-          className="p-3 sm:p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
+          className="p-3 sm:p-4 bg-white border-t border-slate-100 flex items-center gap-2"
         >
           <input
             type="text"
@@ -413,12 +409,12 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                 ? `Search or ask in ${languageNames[language]?.label}... (e.g. shoes under 3000)`
                 : 'Ask for merchant insights, promotions, or campaign advice...'
             }
-            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+            className="flex-1 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full px-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 transition-colors font-medium"
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || loading}
-            className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-40 text-white shadow-lg shadow-brand-500/20 transition-all active:scale-95"
+            className="p-2.5 rounded-full bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white shadow-sm transition-all active:scale-95"
           >
             <Send className="w-4 h-4" />
           </button>

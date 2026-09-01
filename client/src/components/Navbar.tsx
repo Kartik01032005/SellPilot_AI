@@ -13,9 +13,8 @@ import {
   Compass,
   Sparkles,
   Globe,
-  CheckCircle2,
-  AlertCircle,
   Package,
+  ChevronDown,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -38,83 +37,90 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { language, setLanguage, languageNames } = useLanguage();
 
   return (
-    <header className="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 transition-all">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/85 backdrop-blur-md transition-all font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand / Logo */}
+        {/* Brand / Logo & Navigation */}
         <div className="flex items-center space-x-6">
           <div
             onClick={() => setActiveTab('discovery')}
-            className="flex items-center space-x-3 cursor-pointer group"
+            className="flex items-center space-x-2.5 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
-              <Bot className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 via-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-brand-500/20 text-white group-hover:scale-105 transition-transform">
+              <Bot className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-lg tracking-tight text-white">SellPilot AI</span>
-                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
-                  Track 01
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">AI Growth & Agentic Commerce</p>
+            <div className="flex items-center space-x-2">
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900">
+                SellPilot<span className="text-brand-600">.ai</span>
+              </span>
+              <span className="hidden sm:inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
+                Track 01
+              </span>
             </div>
           </div>
 
-          {/* Navigation Mode Tabs */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+          {/* Navigation Mode Tabs (Pill Style) */}
+          <nav className="hidden md:flex items-center space-x-1 bg-slate-100/90 p-1 rounded-full border border-slate-200/70">
             <button
               onClick={() => setActiveTab('discovery')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
                 activeTab === 'discovery'
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Compass className="w-3.5 h-3.5" />
+              <Compass className="w-3.5 h-3.5 text-brand-600" />
               <span>Buyer Discovery</span>
             </button>
 
-            {user?.role === 'merchant' || user?.role === 'admin' ? (
-              <button
-                onClick={() => setActiveTab('merchant')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  activeTab === 'merchant'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span>Merchant Hub</span>
-              </button>
-            ) : null}
+            <button
+              onClick={() => {
+                if (!user) {
+                  openAuthModal();
+                } else {
+                  setActiveTab('merchant');
+                }
+              }}
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeTab === 'merchant'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5 text-brand-600" />
+              <span>Merchant Hub</span>
+            </button>
 
-            {user ? (
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  activeTab === 'orders'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
-              >
-                <Package className="w-3.5 h-3.5" />
-                <span>My Orders</span>
-              </button>
-            ) : null}
+            <button
+              onClick={() => {
+                if (!user) {
+                  openAuthModal();
+                } else {
+                  setActiveTab('orders');
+                }
+              }}
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeTab === 'orders'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5 text-brand-600" />
+              <span>My Orders</span>
+            </button>
           </nav>
         </div>
 
         {/* Right Actions (Language, AI Trigger, Cart, Auth) */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5 sm:space-x-3">
           {/* Server Status Badge */}
-          <div className="hidden lg:flex items-center space-x-1.5 text-xs text-slate-400 bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-full">
+          <div className="hidden lg:flex items-center space-x-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200/80 px-3 py-1 rounded-full">
             <span
               className={`w-2 h-2 rounded-full ${
-                serverStatus.status === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                serverStatus.status === 'healthy' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
               }`}
             />
-            <span className="capitalize text-[11px]">
-              {serverStatus.loading ? 'Checking' : serverStatus.status}
+            <span className="capitalize text-[11px] font-semibold">
+              {serverStatus.loading ? 'Connecting' : serverStatus.status}
             </span>
           </div>
 
@@ -125,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               value={language}
               onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
               aria-label="Select Language"
-              className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl pl-8 pr-2 py-1.5 focus:outline-none focus:border-brand-500 appearance-none cursor-pointer"
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-semibold rounded-full pl-8 pr-6 py-1.5 focus:outline-none focus:border-brand-500 appearance-none cursor-pointer transition-colors"
             >
               {Object.entries(languageNames).map(([key, item]) => (
                 <option key={key} value={key}>
@@ -133,26 +139,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
 
-          {/* AI Chat Button */}
+          {/* AI Chat Button (Primary Pill CTA) */}
           <button
             onClick={openChatModal}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-brand-500/20 transition-all transform active:scale-95"
+            className="flex items-center space-x-1.5 px-4 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
           >
-            <Sparkles className="w-3.5 h-3.5 text-brand-200 animate-spin-slow" />
+            <Sparkles className="w-3.5 h-3.5 text-brand-300 animate-pulse" />
             <span>Ask SellPilot AI</span>
           </button>
 
           {/* Cart Trigger */}
           <button
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
+            className="relative p-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 hover:text-slate-900 transition-all"
             title="Open Cart"
           >
             <ShoppingCart className="w-4 h-4" />
             {itemCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-brand-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">
+              <span className="absolute -top-1 -right-1 bg-brand-600 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
                 {itemCount}
               </span>
             )}
@@ -160,20 +167,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Auth Button / Profile */}
           {user ? (
-            <div className="flex items-center space-x-2 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
-              <div className="w-5 h-5 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-bold">
+            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200/80 rounded-full pl-1.5 pr-2.5 py-1">
+              <div className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
                 {user.email[0].toUpperCase()}
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-xs font-medium text-slate-200 truncate max-w-[100px]">
+                <p className="text-xs font-bold text-slate-800 truncate max-w-[90px]">
                   {user.email.split('@')[0]}
                 </p>
-                <p className="text-[10px] text-slate-400 capitalize">{user.role}</p>
+                <p className="text-[10px] text-slate-500 capitalize font-medium">{user.role}</p>
               </div>
               <button
                 onClick={logout}
                 title="Logout"
-                className="text-slate-400 hover:text-rose-400 p-1 transition-colors"
+                className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -181,9 +188,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={openAuthModal}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-medium transition-all"
+              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition-all"
             >
-              <User className="w-3.5 h-3.5 text-slate-400" />
+              <User className="w-3.5 h-3.5 text-slate-500" />
               <span>Login</span>
             </button>
           )}

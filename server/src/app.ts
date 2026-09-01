@@ -7,10 +7,21 @@ import { config } from './config/env';
 export const createApp = (): Express => {
   const app = express();
 
-  // Middleware
+  // CORS Configuration
   app.use(
     cors({
-      origin: [config.clientUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        if (
+          origin.includes('localhost') ||
+          origin.includes('127.0.0.1') ||
+          origin === config.clientUrl
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],

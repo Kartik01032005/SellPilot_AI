@@ -5,6 +5,7 @@ import { authenticateToken, requireMerchant } from '../middleware/auth';
 const router = Router();
 
 router.get('/', ProductController.getProducts);
+router.post('/seed', ProductController.seedProducts);
 router.get('/:id', ProductController.getProductById);
 router.post('/', authenticateToken, requireMerchant, ProductController.createProduct);
 router.put('/:id', authenticateToken, requireMerchant, ProductController.updateProduct);
