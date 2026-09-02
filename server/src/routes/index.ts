@@ -12,6 +12,7 @@ import recommendationsRouter from './recommendations';
 import conversationsRouter from './conversations';
 import auditRouter from './audit';
 import aiRouter from './ai';
+import agentRouter from './agent';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ const router = Router();
 router.use('/health', healthRouter);
 router.use('/auth', authRouter);
 router.use('/ai', aiRouter);
+router.use('/agent', agentRouter);
 router.use('/products', productsRouter);
 router.use('/catalog', catalogRouter);
 router.use('/orders', ordersRouter);

@@ -106,41 +106,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return prep;
       }
 
-      const subtotal = items.reduce((acc, it) => acc + it.price * it.quantity, 0);
-      const fallbackCheckout: PreparedCheckout = {
-        subtotal,
-        discount: 0,
-        total: subtotal,
-        currency: 'INR',
-        items: items.map((it) => ({
-          productId: it.productId,
-          name: it.name,
-          price: it.price,
-          quantity: it.quantity,
-          lineTotal: it.price * it.quantity,
-        })),
-      };
-      setPreparedCheckout(fallbackCheckout);
+      setPreparedCheckout(null);
       setPrepareCheckoutLoading(false);
-      return fallbackCheckout;
+      return null;
     } catch {
-      const subtotal = items.reduce((acc, it) => acc + it.price * it.quantity, 0);
-      const fallbackCheckout: PreparedCheckout = {
-        subtotal,
-        discount: 0,
-        total: subtotal,
-        currency: 'INR',
-        items: items.map((it) => ({
-          productId: it.productId,
-          name: it.name,
-          price: it.price,
-          quantity: it.quantity,
-          lineTotal: it.price * it.quantity,
-        })),
-      };
-      setPreparedCheckout(fallbackCheckout);
+      setPreparedCheckout(null);
       setPrepareCheckoutLoading(false);
-      return fallbackCheckout;
+      return null;
     }
   }, [items]);
 

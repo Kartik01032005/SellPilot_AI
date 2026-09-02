@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { Product, IProduct } from '../models/Product';
 import { CustomError } from '../middleware/errorHandler';
+import { config } from '../config/env';
+import { SeedService } from './seedService';
 
 export interface ProductFilterParams {
   merchantId?: string;
@@ -54,10 +56,9 @@ export class ProductService {
   }
 
   public static async getProducts(filters: ProductFilterParams): Promise<IProduct[]> {
-    if (mongoose.connection.readyState !== 0 && process.env.NODE_ENV !== 'test') {
+    if (mongoose.connection.readyState !== 0 && !config.isTest && !config.isProduction) {
       const count = await Product.countDocuments();
       if (count === 0) {
-        const { SeedService } = await import('./seedService');
         await SeedService.seedCatalogIfEmpty();
       }
     }
@@ -126,7 +127,7 @@ export class ProductService {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
-    if (product.merchantId && product.merchantId.toString() !== merchantId) {
+    if (!product.merchantId || product.merchantId.toString() !== merchantId) {
       throw new CustomError('Not authorized to update this product', 403, 'FORBIDDEN');
     }
 
@@ -152,7 +153,7 @@ export class ProductService {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
-    if (product.merchantId && product.merchantId.toString() !== merchantId) {
+    if (!product.merchantId || product.merchantId.toString() !== merchantId) {
       throw new CustomError('Not authorized to delete this product', 403, 'FORBIDDEN');
     }
 
@@ -178,14 +179,23 @@ export class ProductService {
 
     return products.map((p) => ({
       id: p._id.toString(),
+      productId: p._id.toString(),
       name: p.name,
+      description: p.description || '',
       category: p.category,
       price: p.price,
       currency: p.currency || 'INR',
       available: p.stock > 0,
+      availability: p.stock <= 0 ? 'OUT_OF_STOCK' : p.stock <= 5 ? 'LOW_STOCK' : 'IN_STOCK',
       inventory: p.stock,
-      features: p.features,
-      relatedProducts: p.relatedProducts.map((rel: any) =>
+      inventoryStatus: p.stock <= 0 ? 'OUT_OF_STOCK' : p.stock <= 5 ? 'LOW_STOCK' : 'IN_STOCK',
+      features: p.features || [],
+      tags: p.tags || [],
+      sku: p.sku,
+      merchantId: p.merchantId ? p.merchantId.toString() : undefined,
+      active: p.isActive,
+      isActive: p.isActive,
+      relatedProducts: (p.relatedProducts || []).map((rel: any) =>
         rel._id ? rel._id.toString() : rel.toString()
       ),
     }));

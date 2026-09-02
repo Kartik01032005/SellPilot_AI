@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { IntentService, IntentResult, ExtractedRequirements } from './intentService';
 import { ToolRegistry, AgentToolContext } from './toolRegistry';
 import { ToolExecutionService, ToolExecutionResponse } from './toolExecutionService';
@@ -15,6 +16,7 @@ export interface ChatRequestParams {
   userId?: string;
   merchantId?: string;
   userRole?: string;
+  correlationId?: string;
 }
 
 export interface ToolExecutionSummary {
@@ -64,6 +66,7 @@ export interface ChatResponseResult {
   merchantInsights?: Record<string, unknown>;
   requiresConfirmation?: boolean;
   conversationId?: string;
+  correlationId?: string;
 }
 
 /**
@@ -84,6 +87,9 @@ export class AgentService {
 
     const mode = params.mode || 'buyer';
     const reqLang = params.language || 'en';
+    const correlationId = params.correlationId && /^spc_[a-f0-9-]{36}$/.test(params.correlationId)
+      ? params.correlationId
+      : `spc_${crypto.randomUUID()}`;
 
     // 1. Intent Detection & Requirement Extraction
     const intentResult = IntentService.processMessage(rawMessage, mode);
@@ -92,12 +98,17 @@ export class AgentService {
 
     // 2. Conversation Context Resolution
     let conversation = null;
+    let conversationWasCreated = false;
     const sessionKey = params.conversationId || params.userId || 'default_session';
 
     if (mongoose.connection.readyState !== 0) {
       if (params.conversationId && mongoose.Types.ObjectId.isValid(params.conversationId)) {
         try {
-          conversation = await ConversationService.getConversationById(params.conversationId);
+          conversation = await ConversationService.getConversationById(
+            params.conversationId,
+            params.userId,
+            params.merchantId
+          );
         } catch {
           // Continue if conversation not found
         }
@@ -112,6 +123,7 @@ export class AgentService {
             language: finalLanguage,
             initialMessage: { role: 'user', content: rawMessage },
           });
+          conversationWasCreated = true;
         } catch {
           // Fallback gracefully
         }
@@ -124,14 +136,48 @@ export class AgentService {
       userRole: params.userRole || (mode === 'merchant' ? 'merchant' : 'customer'),
       conversationId: conversation?._id?.toString() || params.conversationId,
       language: finalLanguage,
+      correlationId,
     };
 
-    // 3. Dispatch to Agent Reasoning Layer
-    if (mode === 'merchant') {
-      return await this.executeMerchantAgentFlow(params, intentResult, finalLanguage, context, sessionKey);
-    } else {
-      return await this.executeBuyerAgentFlow(params, intentResult, finalLanguage, context, sessionKey);
+    await AuditService.log({
+      userId: params.userId,
+      merchantId: context.merchantId,
+      action: 'agent_intent_detected',
+      eventType: 'intent_detected',
+      actorType: mode === 'merchant' ? 'merchant_agent' : 'buyer_agent',
+      actorId: params.userId,
+      correlationId,
+      status: 'success',
+      metadata: { intent: intentResult.intent, mode },
+    });
+
+    if (conversation && params.userId && !conversationWasCreated) {
+      await ConversationService.addMessage(
+        conversation._id.toString(),
+        'user',
+        rawMessage,
+        params.userId,
+        params.merchantId
+      );
     }
+
+    // 3. Dispatch to Agent Reasoning Layer
+    const response = mode === 'merchant'
+      ? await this.executeMerchantAgentFlow(params, intentResult, finalLanguage, context, sessionKey)
+      : await this.executeBuyerAgentFlow(params, intentResult, finalLanguage, context, sessionKey);
+
+    if (conversation && params.userId) {
+      await ConversationService.addMessage(
+        conversation._id.toString(),
+        'assistant',
+        response.message,
+        params.userId,
+        params.merchantId
+      );
+    }
+
+    response.correlationId = correlationId;
+    return response;
   }
 
   /**

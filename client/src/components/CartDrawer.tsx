@@ -21,9 +21,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
 
   if (!isCartOpen) return null;
 
-  const totalAmount =
-    preparedCheckout?.total ??
-    items.reduce((acc, it) => acc + it.price * it.quantity, 0);
+  const totalAmount = preparedCheckout?.total ?? 0;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden animate-fade-in font-sans">
@@ -134,7 +132,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                   <span className="text-base text-brand-600 font-black">
                     {prepareCheckoutLoading
                       ? 'Calculating...'
-                      : `₹${totalAmount.toLocaleString('en-IN')}`}
+                      : preparedCheckout
+                        ? `₹${totalAmount.toLocaleString('en-IN')}`
+                        : 'Unavailable'}
                   </span>
                 </div>
               </div>
@@ -144,7 +144,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                   setIsCartOpen(false);
                   onOpenCheckout();
                 }}
-                className="w-full py-3.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-95"
+                disabled={prepareCheckoutLoading || !preparedCheckout}
+                className="w-full py-3.5 rounded-full bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-95"
               >
                 <span>Proceed to Checkout</span>
                 <ArrowRight className="w-4 h-4" />

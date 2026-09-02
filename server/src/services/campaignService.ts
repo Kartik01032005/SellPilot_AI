@@ -22,7 +22,7 @@ export class CampaignService {
     const merchant = await Merchant.findById(merchantId);
     const maxAllowed = merchant?.maxDiscountPercentage ?? 25;
 
-    if (discountPercentage > maxAllowed) {
+    if (!Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > maxAllowed) {
       return {
         allowed: false,
         maxAllowed,
@@ -41,7 +41,12 @@ export class CampaignService {
       throw new CustomError('Campaign name and at least one product ID are required', 400, 'INVALID_REQUEST');
     }
 
-    if (input.discountPercentage === undefined || input.discountPercentage < 0) {
+    if (
+      input.discountPercentage === undefined ||
+      !Number.isFinite(input.discountPercentage) ||
+      input.discountPercentage < 0 ||
+      input.discountPercentage > 100
+    ) {
       throw new CustomError('Valid discount percentage is required', 400, 'INVALID_REQUEST');
     }
 
@@ -55,18 +60,28 @@ export class CampaignService {
       );
     }
 
-    // Validate products exist
+    if (!mongoose.Types.ObjectId.isValid(input.merchantId)) {
+      throw new CustomError('Invalid merchant ID', 400, 'INVALID_REQUEST');
+    }
+    const merchant = await Merchant.findById(input.merchantId);
+    if (!merchant) {
+      throw new CustomError('Merchant not found', 404, 'NOT_FOUND');
+    }
+
+    // Validate products belong to the merchant
     for (const pid of input.productIds) {
       if (!mongoose.Types.ObjectId.isValid(pid)) {
         throw new CustomError(`Invalid product ID: ${pid}`, 400, 'INVALID_REQUEST');
       }
-      const product = await Product.findById(pid);
+      const product = await Product.findOne({
+        _id: pid,
+        merchantId: new mongoose.Types.ObjectId(input.merchantId),
+      });
       if (!product) {
         throw new CustomError(`Product not found: ${pid}`, 404, 'NOT_FOUND');
       }
     }
 
-    const merchant = await Merchant.findById(input.merchantId);
     const initialStatus = merchant?.approvalRequired ? 'pending_approval' : 'approved';
 
     const campaign = new Campaign({

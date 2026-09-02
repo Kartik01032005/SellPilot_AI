@@ -97,6 +97,7 @@ export class AIController {
           merchantId: req.user?.merchantId || req.user?.userId,
           userRole: req.user?.role,
           conversationId: req.body.conversationId,
+          correlationId: req.body.correlationId,
         },
       });
 

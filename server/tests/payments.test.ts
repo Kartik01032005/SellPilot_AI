@@ -12,7 +12,7 @@ describe('Payment & Razorpay Safety Foundation', () => {
 
   app.post('/api/payment/create-order', authenticateToken, PaymentController.createOrder);
   app.post('/api/payment/verify', authenticateToken, PaymentController.verifyPayment);
-  app.get('/api/payment/:orderId/status', PaymentController.getPaymentStatus);
+  app.get('/api/payment/:orderId/status', authenticateToken, PaymentController.getPaymentStatus);
   app.use(errorHandler);
 
   const customerToken = jwt.sign(
@@ -50,7 +50,9 @@ describe('Payment & Razorpay Safety Foundation', () => {
   });
 
   it('validates orderId on status check', async () => {
-    const res = await request(app).get('/api/payment/invalid_order_id/status');
+      const res = await request(app)
+        .get('/api/payment/invalid_order_id/status')
+        .set('Authorization', `Bearer ${customerToken}`);
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('INVALID_REQUEST');
   });

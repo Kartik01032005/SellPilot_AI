@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { AIController } from '../controllers/aiController';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // POST /api/ai/chat - Optional authentication so guests can browse products while logged in users get full history
 router.post('/chat', (req, res, next) => {
   if (req.headers.authorization) {
-    return authenticateToken(req as any, res, next);
+    return authenticateToken(req as AuthRequest, res, next);
   }
   next();
 }, AIController.chat);
@@ -21,7 +21,7 @@ router.get('/tools', AIController.getTools);
 // POST /api/ai/tools/execute - Execute a specific agent tool
 router.post('/tools/execute', (req, res, next) => {
   if (req.headers.authorization) {
-    return authenticateToken(req as any, res, next);
+    return authenticateToken(req as AuthRequest, res, next);
   }
   next();
 }, AIController.executeTool);

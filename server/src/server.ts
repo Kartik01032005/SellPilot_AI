@@ -9,7 +9,9 @@ const startServer = async () => {
     await connectDB();
 
     // Auto seed default catalog if database is empty
-    await SeedService.seedCatalogIfEmpty();
+    if (!config.isProduction) {
+      await SeedService.seedCatalogIfEmpty();
+    }
 
     // Start Express Listener on all network interfaces
     app.listen(config.port, '0.0.0.0', () => {

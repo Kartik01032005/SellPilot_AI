@@ -41,18 +41,16 @@ export class MerchantService {
       throw new CustomError('Merchant not found', 404, 'NOT_FOUND');
     }
 
-    // Fetch products belonging to this merchant or active catalog items
     const products = await Product.find({
-      $or: [
-        { merchantId: new mongoose.Types.ObjectId(merchantId) },
-        { isActive: true },
-      ],
+      merchantId: new mongoose.Types.ObjectId(merchantId),
+      isActive: true,
     })
       .populate('relatedProducts', 'name price category stock currency isActive')
       .exec();
 
     // Query actual order items to calculate sales metrics if orders exist
     const orders = await Order.find({
+      merchantId: new mongoose.Types.ObjectId(merchantId),
       status: { $in: ['paid', 'completed'] },
     }).exec();
 
@@ -107,7 +105,7 @@ export class MerchantService {
     for (const p of products) {
       if (p.relatedProducts && p.relatedProducts.length > 0) {
         for (const rel of p.relatedProducts as any[]) {
-          if (rel && rel.name && rel.stock > 0) {
+          if (rel && rel.name && rel.stock > 0 && rel.merchantId?.toString() === merchantId) {
             crossSellOpportunities.push({
               productId: p._id.toString(),
               name: p.name,

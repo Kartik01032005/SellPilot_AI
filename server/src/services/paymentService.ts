@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Razorpay from 'razorpay';
 import { Payment, IPayment } from '../models/Payment';
-import { Order } from '../models/Order';
+import { Order, IOrderItem } from '../models/Order';
 import { Product } from '../models/Product';
 import { config } from '../config/env';
 import { CustomError } from '../middleware/errorHandler';
@@ -15,9 +15,13 @@ export interface VerifyPaymentInput {
 }
 
 export class PaymentService {
-  private static getRazorpayInstance(): Razorpay | null {
-    if (!config.razorpay.keyId || !config.razorpay.keySecret) {
-      return null;
+  private static getRazorpayInstance(): Razorpay {
+    if (!config.razorpay.isTestMode || !config.razorpay.keySecret) {
+      throw new CustomError(
+        'Razorpay Test Mode credentials are required. Live payment credentials are not supported.',
+        503,
+        'PAYMENT_UNAVAILABLE'
+      );
     }
     return new Razorpay({
       key_id: config.razorpay.keyId,
@@ -33,6 +37,7 @@ export class PaymentService {
     razorpayOrderId: string;
     amount: number;
     currency: string;
+    correlationId?: string;
   }> {
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       throw new CustomError('Invalid order ID', 400, 'INVALID_REQUEST');
@@ -41,6 +46,10 @@ export class PaymentService {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new CustomError('Order not found', 404, 'NOT_FOUND');
+    }
+
+    if (order.userId.toString() !== userId) {
+      throw new CustomError('Not authorized to create payment for this order', 403, 'FORBIDDEN');
     }
 
     if (order.status === 'paid' || order.status === 'completed') {
@@ -73,26 +82,16 @@ export class PaymentService {
       const razorpay = this.getRazorpayInstance();
       const amountInPaise = Math.round(order.totalAmount * 100);
 
-      if (razorpay) {
-        try {
-          const rzpOrder = await razorpay.orders.create({
-            amount: amountInPaise,
-            currency: order.currency || 'INR',
-            receipt: `rcpt_${order._id.toString().substring(0, 10)}`,
-            notes: {
-              orderId: order._id.toString(),
-              userId: userId,
-            },
-          });
-          rzpOrderId = rzpOrder.id;
-        } catch (err) {
-          console.warn('[PaymentService] Razorpay SDK fallback mode:', err);
-          rzpOrderId = `order_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        }
-      } else {
-        // Test fallback ID when mock credentials are used
-        rzpOrderId = `order_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      }
+      const rzpOrder = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: order.currency || 'INR',
+        receipt: `rcpt_${order._id.toString().substring(0, 10)}`,
+        notes: {
+          orderId: order._id.toString(),
+          userId: userId,
+        },
+      });
+      rzpOrderId = rzpOrder.id;
 
       payment = new Payment({
         orderId: order._id,
@@ -103,6 +102,7 @@ export class PaymentService {
         currency: order.currency,
         status: 'created',
         verificationStatus: 'unverified',
+        correlationId: order.correlationId,
       });
       await payment.save();
 
@@ -120,7 +120,11 @@ export class PaymentService {
       entityId: payment._id.toString(),
       amount: order.totalAmount,
       status: 'pending',
-      metadata: { razorpayOrderId: rzpOrderId },
+      metadata: { razorpayOrderId: rzpOrderId, correlationId: order.correlationId },
+      eventType: 'payment_order_created',
+      actorType: 'buyer_agent',
+      actorId: userId,
+      correlationId: order.correlationId,
     });
 
     return {
@@ -128,6 +132,7 @@ export class PaymentService {
       razorpayOrderId: rzpOrderId,
       amount: order.totalAmount,
       currency: order.currency,
+      correlationId: order.correlationId,
     };
   }
 
@@ -150,7 +155,7 @@ export class PaymentService {
       );
     }
 
-    const payment = await Payment.findOne({ razorpayOrderId });
+    let payment = await Payment.findOne({ razorpayOrderId });
     if (!payment) {
       throw new CustomError('Payment transaction not found', 404, 'NOT_FOUND');
     }
@@ -158,6 +163,10 @@ export class PaymentService {
     const order = await Order.findById(payment.orderId);
     if (!order) {
       throw new CustomError('Associated order not found', 404, 'NOT_FOUND');
+    }
+
+    if (userId && order.userId && order.userId.toString() !== userId) {
+      throw new CustomError('Not authorized to verify this payment', 403, 'FORBIDDEN');
     }
 
     // Duplicate Operation Protection: If already verified and paid, return idempotently
@@ -172,15 +181,15 @@ export class PaymentService {
 
     // Verify HMAC SHA256 signature
     let isValid = false;
-    if (config.razorpay.keySecret && !config.razorpay.keySecret.includes('placeholder')) {
+    if (config.razorpay.isTestMode && config.razorpay.keySecret && razorpaySignature.length === 64) {
       const generatedSignature = crypto
         .createHmac('sha256', config.razorpay.keySecret)
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
         .digest('hex');
-      isValid = generatedSignature === razorpaySignature;
-    } else {
-      // In test mode with mock keys, verify signature string structure
-      isValid = razorpaySignature.length > 0 && !razorpaySignature.includes('invalid');
+      isValid = crypto.timingSafeEqual(
+        Buffer.from(generatedSignature),
+        Buffer.from(razorpaySignature)
+      );
     }
 
     if (!isValid) {
@@ -200,18 +209,42 @@ export class PaymentService {
         amount: payment.amount,
         status: 'failed',
         metadata: { razorpayOrderId, razorpayPaymentId },
+        eventType: 'payment_verification_failed',
+        actorType: 'buyer_agent',
+        actorId: userId,
+        correlationId: order.correlationId,
       });
 
       throw new CustomError('Payment verification failed: invalid signature', 400, 'PAYMENT_NOT_VERIFIED');
     }
 
-    // Update payment record
-    payment.razorpayPaymentId = razorpayPaymentId;
-    payment.status = 'paid';
-    payment.verificationStatus = 'verified';
-    await payment.save();
+    // Claim the verification once so concurrent Razorpay callbacks cannot both deduct stock.
+    const claimedPayment = await Payment.findOneAndUpdate(
+      {
+        _id: payment._id,
+        status: { $in: ['created', 'pending'] },
+        verificationStatus: 'unverified',
+      },
+      { $set: { status: 'pending' } },
+      { new: true }
+    );
+    if (!claimedPayment) {
+      const latestPayment = await Payment.findById(payment._id);
+      if (latestPayment?.status === 'paid' && latestPayment.verificationStatus === 'verified') {
+        return {
+          success: true,
+          verified: true,
+          status: 'paid',
+          orderId: order._id.toString(),
+        };
+      }
+      throw new CustomError('Payment verification is already in progress or has been completed', 409, 'DUPLICATE_OPERATION');
+    }
+    payment = claimedPayment;
 
-    // Deduct stock for items in order atomically
+    // Reserve inventory only after a valid signature and before marking payment paid.
+    payment.razorpayPaymentId = razorpayPaymentId;
+    const deductedItems: IOrderItem[] = [];
     for (const item of order.items) {
       const updatedProduct = await Product.findOneAndUpdate(
         { _id: item.productId, stock: { $gte: item.quantity } },
@@ -220,12 +253,42 @@ export class PaymentService {
       );
 
       if (!updatedProduct) {
-        // Fallback decrement if exact conditional update had concurrency edge
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.quantity },
+        for (const deductedItem of deductedItems) {
+          await Product.findByIdAndUpdate(deductedItem.productId, {
+            $inc: { stock: deductedItem.quantity },
+          });
+        }
+        payment.status = 'failed';
+        payment.verificationStatus = 'failed';
+        await payment.save();
+        order.status = 'failed';
+        await order.save();
+        await AuditService.log({
+          userId: userId || payment.userId.toString(),
+          merchantId: payment.merchantId,
+          action: 'inventory_reservation_failed',
+          eventType: 'inventory_reservation_failed',
+          actorType: 'buyer_agent',
+          actorId: userId,
+          correlationId: order.correlationId,
+          entityType: 'Order',
+          entityId: order._id.toString(),
+          amount: payment.amount,
+          status: 'failed',
+          metadata: { orderNumber: order.orderNumber, failedProduct: item.name },
         });
+        throw new CustomError(
+          `Insufficient inventory for ${item.name || 'an order item'}`,
+          409,
+          'OUT_OF_STOCK'
+        );
       }
+      deductedItems.push(item);
     }
+
+    payment.status = 'paid';
+    payment.verificationStatus = 'verified';
+    await payment.save();
 
     // Update order status & timestamps
     order.status = 'paid';
@@ -256,6 +319,10 @@ export class PaymentService {
         razorpayPaymentId,
         orderId: order._id.toString(),
       },
+      eventType: 'payment_verified',
+      actorType: 'buyer_agent',
+      actorId: userId,
+      correlationId: order.correlationId,
     });
 
     return {
@@ -283,6 +350,10 @@ export class PaymentService {
       throw new CustomError('Order not found', 404, 'NOT_FOUND');
     }
 
+    if (userId && order.userId.toString() !== userId) {
+      throw new CustomError('Not authorized to cancel this payment', 403, 'FORBIDDEN');
+    }
+
     if (order.status === 'paid' || order.status === 'completed') {
       throw new CustomError('Cannot cancel an already completed payment', 400, 'INVALID_STATE');
     }
@@ -303,6 +374,10 @@ export class PaymentService {
       entityType: 'Order',
       entityId: order._id.toString(),
       status: 'rejected',
+      eventType: 'payment_cancelled',
+      actorType: 'buyer_agent',
+      actorId: userId,
+      correlationId: order.correlationId,
     });
 
     return {
@@ -312,7 +387,12 @@ export class PaymentService {
     };
   }
 
-  public static async getPaymentStatus(orderId: string): Promise<{
+  public static async getPaymentStatus(
+    orderId: string,
+    userId: string,
+    role: string,
+    merchantId?: string
+  ): Promise<{
     status: string;
     verified: boolean;
     amount?: number;
@@ -328,7 +408,24 @@ export class PaymentService {
       if (!order) {
         throw new CustomError('Order not found', 404, 'NOT_FOUND');
       }
+      if (
+        role !== 'admin' &&
+        order.userId.toString() !== userId &&
+        order.merchantId?.toString() !== merchantId
+      ) {
+        throw new CustomError('Not authorized to view this payment', 403, 'FORBIDDEN');
+      }
       return { status: order.status, verified: order.status === 'paid' };
+    }
+
+    const order = await Order.findById(orderId).select('userId merchantId').exec();
+    if (
+      order &&
+      role !== 'admin' &&
+      order.userId.toString() !== userId &&
+      order.merchantId?.toString() !== merchantId
+    ) {
+      throw new CustomError('Not authorized to view this payment', 403, 'FORBIDDEN');
     }
 
     return {

@@ -49,6 +49,34 @@ export class ConversationCartService {
     return cart;
   }
 
+  private static async resolveActiveProduct(productIdentifier: string): Promise<IProduct | null> {
+    if (mongoose.connection.readyState === 0) {
+      return {
+        _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
+        name: productIdentifier.startsWith('mock_') ? 'Pro Running Shoes' : productIdentifier,
+        price: 2999,
+        currency: 'INR',
+        stock: 10,
+        category: 'Shoes',
+        isActive: true,
+      } as any;
+    }
+
+    let product: IProduct | null = null;
+    if (mongoose.Types.ObjectId.isValid(productIdentifier)) {
+      product = await Product.findById(productIdentifier);
+    }
+
+    if (!product) {
+      product = await Product.findOne({
+        name: { $regex: new RegExp(`^${productIdentifier}$`, 'i') },
+        isActive: true,
+      });
+    }
+
+    return product && product.isActive ? product : null;
+  }
+
   public static async addItem(
     productIdentifier: string,
     quantity: number = 1,
@@ -59,32 +87,9 @@ export class ConversationCartService {
       throw new CustomError('Quantity must be greater than 0', 400, 'INVALID_REQUEST');
     }
 
-    let product: IProduct | null = null;
-    if (mongoose.connection.readyState === 0) {
-      // In-memory mock fallback if DB disconnected during pure unit tests
-      product = {
-        _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
-        name: productIdentifier.startsWith('mock_') ? 'Pro Running Shoes' : productIdentifier,
-        price: 2999,
-        currency: 'INR',
-        stock: 10,
-        category: 'Shoes',
-        isActive: true,
-      } as any;
-    } else {
-      if (mongoose.Types.ObjectId.isValid(productIdentifier)) {
-        product = await Product.findById(productIdentifier);
-      }
+    const product = await this.resolveActiveProduct(productIdentifier);
 
-      if (!product) {
-        product = await Product.findOne({
-          name: { $regex: new RegExp(`^${productIdentifier}$`, 'i') },
-          isActive: true,
-        });
-      }
-    }
-
-    if (!product || !product.isActive) {
+    if (!product) {
       throw new CustomError(`Product not found or inactive: ${productIdentifier}`, 404, 'NOT_FOUND');
     }
 
@@ -126,6 +131,49 @@ export class ConversationCartService {
 
     cart.updatedAt = new Date();
     return { cart, addedItem: itemRecord };
+  }
+
+  public static async updateItemQuantity(
+    productIdentifier: string,
+    quantity: number,
+    userId?: string,
+    conversationId?: string
+  ): Promise<{ cart: ConversationCartState; item: CartItemRecord }> {
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 100) {
+      throw new CustomError('Quantity must be between 1 and 100', 400, 'INVALID_QUANTITY');
+    }
+
+    const cart = this.getCart(userId, conversationId);
+    const itemIndex = cart.items.findIndex(
+      (item) => item.productId === productIdentifier || item.name.toLowerCase() === productIdentifier.toLowerCase()
+    );
+    if (itemIndex < 0) {
+      throw new CustomError(`Item not found in cart: ${productIdentifier}`, 404, 'PRODUCT_NOT_FOUND');
+    }
+
+    const product = await this.resolveActiveProduct(cart.items[itemIndex].productId);
+    if (!product) {
+      throw new CustomError('Product not found or inactive', 404, 'PRODUCT_UNAVAILABLE');
+    }
+    if (product.stock < quantity) {
+      throw new CustomError(
+        `Insufficient inventory for ${product.name}. Available: ${product.stock}, requested: ${quantity}`,
+        400,
+        'OUT_OF_STOCK'
+      );
+    }
+
+    cart.items[itemIndex] = {
+      ...cart.items[itemIndex],
+      productId: product._id.toString(),
+      name: product.name,
+      price: product.price,
+      currency: product.currency || 'INR',
+      category: product.category,
+      quantity,
+    };
+    cart.updatedAt = new Date();
+    return { cart, item: cart.items[itemIndex] };
   }
 
   public static removeItem(

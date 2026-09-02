@@ -119,7 +119,11 @@ export class CampaignController {
         throw new CustomError('discountPercentage is required', 400, 'INVALID_REQUEST');
       }
 
-      const result = await CampaignService.validateDiscount(merchantId, Number(discountPercentage));
+      const numericDiscount = Number(discountPercentage);
+      if (!Number.isFinite(numericDiscount) || numericDiscount < 0 || numericDiscount > 100) {
+        throw new CustomError('discountPercentage must be between 0 and 100', 400, 'INVALID_REQUEST');
+      }
+      const result = await CampaignService.validateDiscount(merchantId, numericDiscount);
 
       if (!result.allowed) {
         res.status(400).json({
@@ -134,7 +138,7 @@ export class CampaignController {
       res.status(200).json({
         success: true,
         allowed: true,
-        discountPercentage: Number(discountPercentage),
+        discountPercentage: numericDiscount,
         maxAllowed: result.maxAllowed,
       });
     } catch (error) {

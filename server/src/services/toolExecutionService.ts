@@ -60,8 +60,15 @@ export class ToolExecutionService {
       }
     }
 
+    // Cart identity is always derived from the authenticated execution context.
+    const executionArguments = ['getCart', 'addToCart', 'removeFromCart', 'calculateCart'].includes(tool.name)
+      ? Object.fromEntries(
+          Object.entries(request.arguments).filter(([key]) => key !== 'userId' && key !== 'conversationId')
+        )
+      : request.arguments;
+
     // 2. Argument Validation
-    const validation = tool.validateArgs(request.arguments);
+    const validation = tool.validateArgs(executionArguments);
     if (!validation.valid) {
       return {
         success: false,
@@ -90,13 +97,17 @@ export class ToolExecutionService {
             arguments: request.arguments,
             executionTimeMs,
           },
+          eventType: `agent_tool_${tool.name}`,
+          actorType: request.context.userRole === 'merchant' ? 'merchant_agent' : 'buyer_agent',
+          actorId: request.context.userId,
+          correlationId: request.context.correlationId,
         });
       }
 
       return {
         success: true,
         toolName: tool.name,
-        arguments: validation.parsedArgs || request.arguments,
+        arguments: validation.parsedArgs || executionArguments,
         data,
         executionTimeMs,
       };
@@ -116,6 +127,10 @@ export class ToolExecutionService {
           arguments: request.arguments,
           executionTimeMs,
         },
+        eventType: `agent_tool_${tool.name}_error`,
+        actorType: request.context.userRole === 'merchant' ? 'merchant_agent' : 'buyer_agent',
+        actorId: request.context.userId,
+        correlationId: request.context.correlationId,
       });
 
       return {

@@ -38,7 +38,9 @@ export class ConversationService {
   public static async addMessage(
     conversationId: string,
     role: 'user' | 'assistant' | 'system',
-    content: string
+    content: string,
+    userId?: string,
+    merchantId?: string
   ): Promise<IConversation> {
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       throw new CustomError('Invalid conversation ID', 400, 'INVALID_REQUEST');
@@ -48,6 +50,7 @@ export class ConversationService {
     if (!conversation) {
       throw new CustomError('Conversation not found', 404, 'NOT_FOUND');
     }
+    this.assertOwner(conversation, userId, merchantId);
 
     conversation.messages.push({
       role,
@@ -58,7 +61,11 @@ export class ConversationService {
     return await conversation.save();
   }
 
-  public static async getConversationById(id: string): Promise<IConversation> {
+  public static async getConversationById(
+    id: string,
+    userId?: string,
+    merchantId?: string
+  ): Promise<IConversation> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new CustomError('Invalid conversation ID', 400, 'INVALID_REQUEST');
     }
@@ -67,8 +74,21 @@ export class ConversationService {
     if (!conversation) {
       throw new CustomError('Conversation not found', 404, 'NOT_FOUND');
     }
+    this.assertOwner(conversation, userId, merchantId);
 
     return conversation;
+  }
+
+  private static assertOwner(conversation: IConversation, userId?: string, merchantId?: string): void {
+    if (!userId && !merchantId) {
+      throw new CustomError('Authentication required', 401, 'UNAUTHORIZED');
+    }
+
+    const ownsUserConversation = userId && conversation.userId?.toString() === userId;
+    const ownsMerchantConversation = merchantId && conversation.merchantId?.toString() === merchantId;
+    if (!ownsUserConversation && !ownsMerchantConversation) {
+      throw new CustomError('Not authorized to access this conversation', 403, 'FORBIDDEN');
+    }
   }
 
   public static async getUserConversations(userId: string): Promise<IConversation[]> {

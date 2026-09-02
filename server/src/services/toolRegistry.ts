@@ -13,6 +13,7 @@ export interface AgentToolContext {
   merchantId?: string;
   userRole?: string;
   conversationId?: string;
+  correlationId?: string;
   language?: string;
 }
 
@@ -457,7 +458,7 @@ const getCartTool: AgentTool<
   name: 'getCart',
   description: 'Retrieve all current items in the user or conversation shopping cart.',
   mode: 'buyer',
-  requiresAuth: false,
+  requiresAuth: true,
   parametersSchema: {
     conversationId: { type: 'string', description: 'Conversation ID for conversation-scoped cart' },
     userId: { type: 'string', description: 'User ID' },
@@ -504,7 +505,7 @@ const addToCartTool: AgentTool<
   name: 'addToCart',
   description: 'Add a verified catalog product to the cart after real-time inventory validation.',
   mode: 'buyer',
-  requiresAuth: false,
+  requiresAuth: true,
   parametersSchema: {
     productId: { type: 'string', description: 'Product ID' },
     name: { type: 'string', description: 'Product name' },
@@ -570,7 +571,7 @@ const removeFromCartTool: AgentTool<
   name: 'removeFromCart',
   description: 'Remove an item from the shopping cart.',
   mode: 'buyer',
-  requiresAuth: false,
+  requiresAuth: true,
   parametersSchema: {
     productId: { type: 'string', description: 'Product ID to remove' },
     name: { type: 'string', description: 'Product name to remove' },
@@ -629,7 +630,7 @@ const calculateCartTool: AgentTool<
   name: 'calculateCart',
   description: 'Execute server-side price, discount, and inventory verification for cart total calculation.',
   mode: 'buyer',
-  requiresAuth: false,
+  requiresAuth: true,
   parametersSchema: {
     items: { type: 'array', description: 'List of { productId, quantity } items' },
     discountPercentage: { type: 'number', description: 'Optional discount percentage to apply (capped by merchant rules)' },

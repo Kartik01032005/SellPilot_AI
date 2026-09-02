@@ -1,9 +1,11 @@
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Order, IOrder, IOrderItem, OrderStatus, IShippingAddress } from '../models/Order';
 import { Product } from '../models/Product';
 import { Payment } from '../models/Payment';
 import { CustomError } from '../middleware/errorHandler';
 import { AuditService } from './auditService';
+import { Merchant } from '../models/Merchant';
 
 export interface CreateOrderItemInput {
   productId: string;
@@ -14,6 +16,9 @@ export interface PrepareCheckoutInput {
   items: CreateOrderItemInput[];
   discountPercentage?: number;
   shippingAddress?: IShippingAddress;
+  idempotencyKey?: string;
+  idempotencyFingerprint?: string;
+  correlationId?: string;
 }
 
 export class OrderService {
@@ -106,7 +111,23 @@ export class OrderService {
       });
     }
 
-    const discountPercentage = Math.min(Math.max(input.discountPercentage || 0, 0), 100);
+    const requestedDiscount = input.discountPercentage ?? 0;
+    if (!Number.isFinite(requestedDiscount) || requestedDiscount < 0 || requestedDiscount > 100) {
+      throw new CustomError('Discount percentage must be between 0 and 100', 400, 'INVALID_REQUEST');
+    }
+
+    let discountPercentage = requestedDiscount;
+    if (merchantId) {
+      const merchant = await Merchant.findById(merchantId).select('maxDiscountPercentage').exec();
+      const maxDiscount = merchant?.maxDiscountPercentage ?? 25;
+      if (discountPercentage > maxDiscount) {
+        throw new CustomError(
+          `Discount of ${discountPercentage}% exceeds the merchant limit of ${maxDiscount}%.`,
+          400,
+          'DISCOUNT_LIMIT_EXCEEDED'
+        );
+      }
+    }
     const discount = Math.round((subtotal * discountPercentage) / 100);
     const total = Math.max(subtotal - discount, 0);
 
@@ -131,8 +152,26 @@ export class OrderService {
       throw new CustomError('Valid userId is required to create an order', 400, 'INVALID_REQUEST');
     }
 
+    if (input.idempotencyKey) {
+      const existing = await Order.findOne({
+        userId: new mongoose.Types.ObjectId(userId),
+        idempotencyKey: input.idempotencyKey,
+      });
+      if (existing) {
+        if (existing.idempotencyFingerprint !== input.idempotencyFingerprint) {
+          throw new CustomError(
+            'Idempotency key was already used for a different checkout request',
+            409,
+            'IDEMPOTENCY_CONFLICT'
+          );
+        }
+        return existing;
+      }
+    }
+
     const checkout = await this.calculateCheckout(input);
     const orderNumber = this.generateOrderNumber();
+    const correlationId = input.correlationId || `spc_${crypto.randomUUID()}`;
 
     const order = new Order({
       orderNumber,
@@ -144,6 +183,10 @@ export class OrderService {
       totalAmount: checkout.total,
       currency: checkout.currency,
       status: 'pending',
+      idempotencyKey: input.idempotencyKey,
+      idempotencyFingerprint: input.idempotencyFingerprint,
+      correlationId,
+      actorType: 'buyer_agent',
       shippingAddress: input.shippingAddress || {
         street: '123 Tech Street',
         city: 'Bengaluru',
@@ -160,7 +203,22 @@ export class OrderService {
       ],
     });
 
-    const savedOrder = await order.save();
+    let savedOrder: IOrder;
+    try {
+      savedOrder = await order.save();
+    } catch (error: any) {
+      if (error?.code === 11000 && input.idempotencyKey) {
+        const existing = await Order.findOne({
+          userId: new mongoose.Types.ObjectId(userId),
+          idempotencyKey: input.idempotencyKey,
+        });
+        if (existing && existing.idempotencyFingerprint === input.idempotencyFingerprint) {
+          return existing;
+        }
+        throw new CustomError('Duplicate checkout request', 409, 'IDEMPOTENCY_CONFLICT');
+      }
+      throw error;
+    }
 
     await AuditService.log({
       userId,
@@ -174,7 +232,12 @@ export class OrderService {
         orderNumber,
         itemCount: checkout.items.length,
         total: checkout.total,
+        correlationId,
       },
+      eventType: 'order_created',
+      actorType: 'buyer_agent',
+      actorId: userId,
+      correlationId,
     });
 
     return savedOrder;
@@ -187,7 +250,8 @@ export class OrderService {
     orderId: string,
     userId: string,
     role?: string,
-    reason?: string
+    reason?: string,
+    merchantId?: string
   ): Promise<IOrder> {
     if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
       throw new CustomError('Invalid order ID', 400, 'INVALID_REQUEST');
@@ -201,7 +265,7 @@ export class OrderService {
     // Ownership & permission check
     if (role !== 'admin') {
       const isOwner = order.userId.toString() === userId;
-      const isMerchant = order.merchantId && order.merchantId.toString() === userId;
+      const isMerchant = order.merchantId && order.merchantId.toString() === merchantId;
       if (!isOwner && !isMerchant) {
         throw new CustomError('Not authorized to cancel this order', 403, 'FORBIDDEN');
       }
@@ -263,6 +327,10 @@ export class OrderService {
         restocked: previousStatus === 'paid' || previousStatus === 'processing',
         reason: order.cancellationReason,
       },
+      eventType: 'order_cancelled',
+      actorType: role === 'merchant' ? 'merchant' : 'buyer',
+      actorId: userId,
+      correlationId: order.correlationId,
     });
 
     return updatedOrder;
@@ -327,7 +395,12 @@ export class OrderService {
   /**
    * Retrieves single order by ID with authorization check.
    */
-  public static async getOrderById(orderId: string, userId?: string, role?: string): Promise<IOrder> {
+  public static async getOrderById(
+    orderId: string,
+    userId?: string,
+    role?: string,
+    merchantId?: string
+  ): Promise<IOrder> {
     if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
       throw new CustomError('Invalid order ID', 400, 'INVALID_REQUEST');
     }
@@ -339,8 +412,8 @@ export class OrderService {
 
     if (userId && role !== 'admin') {
       const isOwner = order.userId.toString() === userId;
-      const isMerchant = order.merchantId && order.merchantId.toString() === userId;
-      if (!isOwner && !isMerchant && role !== 'merchant') {
+      const isMerchant = order.merchantId && order.merchantId.toString() === merchantId;
+      if (!isOwner && !isMerchant) {
         throw new CustomError('Not authorized to view this order', 403, 'FORBIDDEN');
       }
     }

@@ -27,7 +27,11 @@ export class ConversationController {
   public static async getConversationById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const conversation = await ConversationService.getConversationById(id);
+      const conversation = await ConversationService.getConversationById(
+        id,
+        req.user?.userId,
+        req.user?.merchantId
+      );
 
       res.status(200).json({
         success: true,
@@ -65,7 +69,13 @@ export class ConversationController {
         throw new CustomError('role and content are required', 400, 'INVALID_REQUEST');
       }
 
-      const updated = await ConversationService.addMessage(id, role, content);
+      const updated = await ConversationService.addMessage(
+        id,
+        role,
+        content,
+        req.user?.userId,
+        req.user?.merchantId
+      );
 
       res.status(200).json({
         success: true,

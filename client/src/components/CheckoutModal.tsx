@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useCart } from '@/context/CartContext';
 import { ApiClient } from '@/lib/api';
 import {
@@ -13,34 +13,62 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    Razorpay?: new (options: {
+      key: string;
+      amount: number;
+      currency: string;
+      name: string;
+      description: string;
+      order_id: string;
+      handler: (response: {
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+      }) => void;
+      modal?: { ondismiss?: () => void };
+    }) => { open: () => void };
+  }
+}
+
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderSuccess: (orderId: string) => void;
+  correlationId?: string;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   onOrderSuccess,
+  correlationId,
 }) => {
   const { items, preparedCheckout, clearCart } = useCart();
 
   const [step, setStep] = useState<'confirm' | 'processing' | 'success' | 'failed'>('confirm');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   if (!isOpen) return null;
 
-  const totalAmount =
-    preparedCheckout?.total ??
-    items.reduce((acc, it) => acc + it.price * it.quantity, 0);
+  const totalAmount = preparedCheckout?.total ?? 0;
 
   const handleConfirmAndPay = async () => {
     setErrorMessage(null);
     setStep('processing');
 
     try {
+      if (!preparedCheckout) {
+        throw new Error('Unable to confirm the server-authoritative total. Refresh the cart and try again.');
+      }
+
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = globalThis.crypto?.randomUUID?.() || `checkout_${Date.now()}_${Math.random()}`;
+      }
+
       // 1. Create Order on Backend
       const orderPayload = {
         items: items.map((it) => ({
@@ -54,6 +82,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           postalCode: '560001',
           country: 'India',
         },
+        idempotencyKey: idempotencyKeyRef.current,
+        correlationId,
+        idempotencyFingerprint: JSON.stringify(items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        }))),
       };
 
       const orderRes = await ApiClient.request<{
@@ -63,6 +97,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           orderNumber: string;
           totalAmount: number;
           status: string;
+          correlationId?: string;
         };
         code?: string;
       }>('/api/orders', {
@@ -86,6 +121,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         amount: number;
         currency: string;
         keyId: string;
+        testMode: boolean;
       }>('/api/payment/create-order', {
         method: 'POST',
         body: JSON.stringify({ orderId: backendOrder._id }),
@@ -97,41 +133,73 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // 3. Razorpay Test Mode Payment Simulation
-      const mockPaymentId = `pay_test_${Date.now()}`;
-      const mockSignature = 'simulated_test_mode_signature';
+      if (!paymentOrderRes.testMode || !paymentOrderRes.keyId.startsWith('rzp_test_') || !window.Razorpay) {
+        throw new Error('Razorpay Test Mode checkout is unavailable. Configure a server-side test key.');
+      }
 
-      // 4. Verify Payment via Backend HMAC
-      const verifyRes = await ApiClient.request<{
-        success: boolean;
-        status: string;
-        orderId: string;
-        paymentId: string;
-        verified: boolean;
-      }>('/api/payment/verify', {
-        method: 'POST',
-        body: JSON.stringify({
-          orderId: backendOrder._id,
-          razorpayOrderId: paymentOrderRes.razorpayOrderId,
-          razorpayPaymentId: mockPaymentId,
-          razorpaySignature: mockSignature,
-        }),
-      });
+      const verifyPayment = async (response: {
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+      }) => {
+        const verifyRes = await ApiClient.request<{
+          success: boolean;
+          status: string;
+          orderId: string;
+          verified: boolean;
+        }>('/api/payment/verify', {
+          method: 'POST',
+          body: JSON.stringify({
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          }),
+        });
 
-      if (verifyRes.success) {
+        if (!verifyRes.success || !verifyRes.verified) {
+          throw new Error(verifyRes.message || 'Payment verification failed');
+        }
+
         setCompletedOrder({
           id: backendOrder._id,
           orderNumber: backendOrder.orderNumber,
           amount: totalAmount,
           status: 'paid',
+          correlationId: backendOrder.correlationId,
         });
         clearCart();
+        idempotencyKeyRef.current = null;
         setStep('success');
         onOrderSuccess(backendOrder._id);
-      } else {
-        setStep('failed');
-        setErrorMessage(verifyRes.message || 'Payment verification failed');
-      }
+      };
+
+      const cancelPayment = () => {
+        void ApiClient.request('/api/payment/cancel', {
+          method: 'POST',
+          body: JSON.stringify({ orderId: backendOrder._id }),
+        });
+      };
+
+      const razorpay = new window.Razorpay({
+        key: paymentOrderRes.keyId,
+        amount: Math.round(paymentOrderRes.amount * 100),
+        currency: paymentOrderRes.currency,
+        name: 'SellPilot AI',
+        description: 'Demo Payment - Razorpay Test Mode',
+        order_id: paymentOrderRes.razorpayOrderId,
+        handler: (response) => void verifyPayment(response).catch((err) => {
+          setStep('failed');
+          setErrorMessage(err instanceof Error ? err.message : 'Payment verification failed');
+        }),
+        modal: {
+          ondismiss: () => {
+            cancelPayment();
+            setStep('failed');
+            setErrorMessage('Payment cancelled. No order was marked as paid.');
+          },
+        },
+      });
+      razorpay.open();
     } catch (err) {
       setStep('failed');
       setErrorMessage(err instanceof Error ? err.message : 'Checkout encountered an error');
@@ -149,7 +217,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">Razorpay Secure Checkout</h2>
-              <p className="text-xs text-slate-500 font-medium">Agentic Commerce Test Mode</p>
+              <p className="text-xs text-slate-500 font-medium">Razorpay Test Mode · Demo Payment</p>
             </div>
           </div>
           {step !== 'processing' && (
@@ -258,6 +326,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {completedOrder && (
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700">
                 Order Reference: <strong className="text-slate-900 font-mono">{completedOrder.orderNumber || completedOrder.id}</strong>
+                {completedOrder.correlationId && (
+                  <span className="block mt-1 text-slate-500">Trace ID: <strong className="font-mono text-slate-700">{completedOrder.correlationId}</strong></span>
+                )}
               </div>
             )}
             <button

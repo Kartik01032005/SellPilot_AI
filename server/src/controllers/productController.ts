@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ProductService } from '../services/productService';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
+import { SeedService } from '../services/seedService';
 
 export class ProductController {
   public static async getProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -126,7 +127,6 @@ export class ProductController {
 
   public static async seedProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { SeedService } = await import('../services/seedService');
       const result = await SeedService.seedCatalogIfEmpty();
 
       res.status(200).json({

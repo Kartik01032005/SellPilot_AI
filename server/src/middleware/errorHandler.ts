@@ -22,7 +22,7 @@ export class CustomError extends Error implements AppError {
 
 export const errorHandler = (
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
@@ -32,6 +32,20 @@ export const errorHandler = (
 
   if (statusCode === 500) {
     console.error('[Error] Unhandled server error:', err);
+  }
+
+  const isAgentCommerceRequest = req.originalUrl.startsWith('/api/agent');
+
+  if (isAgentCommerceRequest) {
+    res.status(statusCode).json({
+      success: false,
+      error: {
+        code,
+        message,
+      },
+      ...(err.details ? { details: err.details } : {}),
+    });
+    return;
   }
 
   res.status(statusCode).json({

@@ -7,11 +7,13 @@ export class AuditController {
   public static async getLogs(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const merchantId = req.user?.role === 'admin' ? undefined : req.user?.merchantId || req.user?.userId;
-      const { action, limit } = req.query;
+      const { action, eventType, correlationId, limit } = req.query;
 
       const logs = await AuditService.getLogs({
         merchantId: merchantId ? merchantId.toString() : undefined,
         action: action as string,
+        eventType: eventType as string,
+        correlationId: correlationId as string,
         limit: limit ? Number(limit) : 50,
       });
 

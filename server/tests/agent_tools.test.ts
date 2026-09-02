@@ -7,8 +7,9 @@ import { ConversationCartService } from '../src/services/conversationCartService
 import jwt from 'jsonwebtoken';
 
 describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
+  const customerUserId = new mongoose.Types.ObjectId().toString();
   const customerToken = jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'buyer@test.com', role: 'customer' },
+    { userId: customerUserId, email: 'buyer@test.com', role: 'customer' },
     process.env.JWT_SECRET || 'test_secret_key_12345'
   );
 
@@ -19,7 +20,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
   );
 
   beforeEach(() => {
-    ConversationCartService.clearCart();
+    ConversationCartService.clearCart(customerUserId);
   });
 
   describe('1. Tool Registry & Discovery', () => {
@@ -118,6 +119,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
       // 1. Add Item
       const addRes = await request(app)
         .post('/api/ai/tools/execute')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           toolName: 'addToCart',
           arguments: { name: 'Pro Running Shoes', quantity: 2, conversationId: 'test_session_cart' },
@@ -130,6 +132,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
       // 2. View Cart
       const cartRes = await request(app)
         .post('/api/ai/tools/execute')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           toolName: 'getCart',
           arguments: { conversationId: 'test_session_cart' },
@@ -142,6 +145,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
       // 3. Calculate Cart
       const calcRes = await request(app)
         .post('/api/ai/tools/execute')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           toolName: 'calculateCart',
           arguments: { conversationId: 'test_session_cart', discountPercentage: 10 },
@@ -198,6 +202,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
     it('executes searchProducts tool for buyer search intent and returns toolsExecuted trace', async () => {
       const res = await request(app)
         .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           message: 'Find me running shoes under 3000',
           mode: 'buyer',
@@ -214,6 +219,7 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
     it('executes checkInventory and addToCart when user asks to add product to cart', async () => {
       const res = await request(app)
         .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           message: 'Add Pro Running Shoes to my cart',
           mode: 'buyer',
@@ -230,10 +236,11 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
 
     it('executes getCart when user asks to view cart contents', async () => {
       // Seed an item first
-      ConversationCartService.addItem('Pro Running Shoes', 1, undefined, 'conv_view_test');
+      await ConversationCartService.addItem('Pro Running Shoes', 1, customerUserId, 'conv_view_test');
 
       const res = await request(app)
         .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
         .send({
           message: 'What is in my cart?',
           mode: 'buyer',

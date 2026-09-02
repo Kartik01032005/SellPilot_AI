@@ -13,14 +13,19 @@ export const createApp = (): Express => {
       origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
-        if (
-          origin.includes('localhost') ||
-          origin.includes('127.0.0.1') ||
-          origin === config.clientUrl
-        ) {
+        let isLocalOrigin = false;
+        try {
+          const parsedOrigin = new URL(origin);
+          isLocalOrigin =
+            (parsedOrigin.protocol === 'http:' &&
+              (parsedOrigin.hostname === 'localhost' || parsedOrigin.hostname === '127.0.0.1'));
+        } catch {
+          isLocalOrigin = false;
+        }
+        if (isLocalOrigin || origin === config.clientUrl) {
           return callback(null, true);
         }
-        return callback(null, true);
+        return callback(new Error('Origin is not allowed by CORS'));
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

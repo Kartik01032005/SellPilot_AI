@@ -142,6 +142,7 @@ export default function HomePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMode, setChatInitialMode] = useState<'buyer' | 'merchant'>('buyer');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [commerceCorrelationId, setCommerceCorrelationId] = useState<string | undefined>();
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
   // Server Health
@@ -181,19 +182,6 @@ export default function HomePage() {
       } else if (res.success && res.products && res.products.length > 0 && selectedCategory !== 'All') {
         setProducts(res.products);
       } else {
-        // Trigger server seeding in background if count was small
-        if (selectedCategory === 'All' && !searchQuery) {
-          ApiClient.request('/api/products/seed', { method: 'POST' }).then((seedRes) => {
-            if (seedRes.success) {
-              ApiClient.request<{ success: boolean; products: ProductItem[] }>('/api/products').then((reRes) => {
-                if (reRes.success && reRes.products && reRes.products.length >= 6) {
-                  setProducts(reRes.products);
-                }
-              });
-            }
-          });
-        }
-
         // Use full default sample products
         let filtered = defaultSampleProducts;
         if (selectedCategory !== 'All') {
@@ -289,7 +277,7 @@ export default function HomePage() {
               <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full border border-brand-200/80 bg-brand-50/80 text-brand-700 text-xs font-bold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-brand-500 animate-ping" />
                 <Sparkles className="w-3.5 h-3.5 text-brand-600" />
-                <span>SellPilot AI 2.0 • Bounded Agentic Commerce & Razorpay Certified</span>
+                <span>SellPilot AI 2.0 • Bounded Agentic Commerce & Razorpay Test Mode</span>
               </div>
 
               {/* Bold SaaS Headline with Manrope Typography */}
@@ -399,7 +387,7 @@ export default function HomePage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Razorpay Test Live
+                          <CheckCircle2 className="w-3 h-3" /> Razorpay Test Mode
                         </span>
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
                           HMAC-SHA256 Verified
@@ -908,12 +896,14 @@ export default function HomePage() {
         onOrderSuccess={(orderId) => {
           setActiveTab('orders');
         }}
+        correlationId={commerceCorrelationId}
       />
       <AIChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         initialMode={chatInitialMode}
         onOpenCheckout={() => setIsCheckoutOpen(true)}
+        onCorrelationId={setCommerceCorrelationId}
       />
     </div>
   );

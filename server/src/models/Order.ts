@@ -44,6 +44,10 @@ export interface IOrder extends Document {
   paymentId?: mongoose.Types.ObjectId;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  idempotencyKey?: string;
+  idempotencyFingerprint?: string;
+  correlationId?: string;
+  actorType?: 'buyer' | 'buyer_agent';
   paidAt?: Date;
   cancelledAt?: Date;
   cancellationReason?: string;
@@ -171,6 +175,16 @@ const OrderSchema: Schema<IOrder> = new Schema(
       type: String,
       index: true,
     },
+    idempotencyKey: {
+      type: String,
+      trim: true,
+    },
+    idempotencyFingerprint: {
+      type: String,
+      trim: true,
+    },
+    correlationId: { type: String, index: true, trim: true },
+    actorType: { type: String, enum: ['buyer', 'buyer_agent'], default: 'buyer_agent' },
     paidAt: {
       type: Date,
     },
@@ -189,6 +203,8 @@ const OrderSchema: Schema<IOrder> = new Schema(
     timestamps: true,
   }
 );
+
+OrderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 export const Order = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
 

@@ -297,28 +297,7 @@ Response:
     "upsellOpportunities": []
   }
 }
-10. Promotion Recommendation API
-POST /api/merchant/promotions/recommend
-
-Generate promotion recommendations.
-
-Request:
-
-{
-  "productId": "PRODUCT_ID"
-}
-
-Response:
-
-{
-  "success": true,
-  "recommendation": {
-    "productId": "PRODUCT_ID",
-    "suggestedDiscount": 10,
-    "reason": "The product has strong sales potential."
-  }
-}
-11. Discount Validation API
+10. Discount Validation API
 POST /api/merchant/discount/validate
 
 Validate a proposed discount.
@@ -390,27 +369,11 @@ Response:
 The system must verify successful activation before reporting success.
 
 13. Cart API
-POST /api/cart
+Cart operations are exposed through the authenticated agent tool endpoint:
 
-Create or update a shopping cart.
+POST /api/ai/tools/execute
 
-Request:
-
-{
-  "productId": "PRODUCT_ID",
-  "quantity": 1
-}
-GET /api/cart
-
-Return the current user's cart.
-
-PUT /api/cart/:productId
-
-Update product quantity.
-
-DELETE /api/cart/:productId
-
-Remove a product from the cart.
+Use `toolName` values `addToCart`, `getCart`, `removeFromCart`, and `calculateCart`. Cart identity is derived from the authenticated user; client-supplied user IDs are ignored.
 
 14. Checkout API
 POST /api/checkout/prepare
@@ -420,7 +383,10 @@ Prepare a checkout before payment.
 Request:
 
 {
-  "cartId": "CART_ID"
+  "items": [
+    { "productId": "PRODUCT_ID", "quantity": 1 }
+  ],
+  "discountPercentage": 0
 }
 
 Response:
@@ -447,8 +413,7 @@ Authentication: Required
 Request:
 
 {
-  "cartId": "CART_ID",
-  "amount": 2999
+  "orderId": "ORDER_ID"
 }
 
 Response:
@@ -456,8 +421,12 @@ Response:
 {
   "success": true,
   "orderId": "RAZORPAY_ORDER_ID",
+  "razorpayOrderId": "RAZORPAY_ORDER_ID",
+  "internalOrderId": "ORDER_ID",
   "amount": 2999,
-  "currency": "INR"
+  "currency": "INR",
+  "keyId": "rzp_test_PUBLIC_KEY",
+  "testMode": true
 }
 
 The backend must validate the actual cart total instead of trusting the frontend amount.
@@ -502,12 +471,27 @@ pending
 paid
 failed
 cancelled
+
+GET /api/orders/:orderId/timeline
+
+Return the recorded, ownership-protected transaction events for an order. The response includes the server-issued `correlationId`, `eventType`, `actorType`, status, timestamp, and safe entity references. It never returns payment secrets or private agent reasoning.
+
+Authentication: Required. The caller must own the order, belong to its merchant, or be an admin.
 16. Order API
 POST /api/orders
 
-Create an order after successful payment verification.
+Create a pending order before payment. The server recalculates prices and inventory from the catalog.
 
 Request:
+
+{
+  "items": [
+    { "productId": "PRODUCT_ID", "quantity": 1 }
+  ],
+  "shippingAddress": {},
+  "idempotencyKey": "UNIQUE_CHECKOUT_KEY",
+  "idempotencyFingerprint": "REQUEST_FINGERPRINT"
+}
 
 {
   "paymentOrderId": "RAZORPAY_ORDER_ID"

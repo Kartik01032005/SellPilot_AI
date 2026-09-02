@@ -10,6 +10,7 @@ export interface IPayment extends Document {
   currency: string;
   status: 'created' | 'pending' | 'paid' | 'failed' | 'cancelled';
   verificationStatus: 'unverified' | 'verified' | 'failed';
+  correlationId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,6 +63,7 @@ const PaymentSchema: Schema<IPayment> = new Schema(
       enum: ['unverified', 'verified', 'failed'],
       default: 'unverified',
     },
+    correlationId: { type: String, index: true, trim: true },
   },
   {
     timestamps: true,

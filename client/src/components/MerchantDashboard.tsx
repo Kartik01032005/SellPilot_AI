@@ -153,7 +153,7 @@ export const MerchantDashboard: React.FC = () => {
 
   const handleValidateDiscount = async (pct: number) => {
     try {
-      const res = await ApiClient.request<{ success: boolean; valid: boolean; message: string; maxAllowed: number }>(
+      const res = await ApiClient.request<{ success: boolean; allowed: boolean; message: string; maxAllowed: number }>(
         '/api/merchant/discount/validate',
         {
           method: 'POST',
@@ -161,11 +161,11 @@ export const MerchantDashboard: React.FC = () => {
         }
       );
       setDiscountValidationMsg({
-        valid: res.valid,
-        message: res.message || (res.valid ? 'Discount within allowed limits' : `Exceeds max ${res.maxAllowed}%`),
+        valid: res.allowed,
+        message: res.message || (res.allowed ? 'Discount within allowed limits' : `Exceeds max ${res.maxAllowed}%`),
       });
     } catch {
-      setDiscountValidationMsg({ valid: true, message: 'Within bounds' });
+      setDiscountValidationMsg({ valid: false, message: 'Unable to validate discount with the server' });
     }
   };
 
@@ -555,13 +555,13 @@ export const MerchantDashboard: React.FC = () => {
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
                     Discount: <strong className="text-slate-900 font-bold">{camp.discountPercentage}%</strong> | 
-                    Approval Status: <strong className="text-slate-900 font-bold">{camp.isApproved ? 'Approved' : 'Pending'}</strong>
+                    Approval Status: <strong className="text-slate-900 font-bold">{camp.status === 'approved' || camp.status === 'active' ? 'Approved' : 'Pending'}</strong>
                   </p>
                 </div>
 
                 {/* Approval & Activation Gates */}
                 <div className="flex items-center gap-2">
-                  {!camp.isApproved && camp.status !== 'active' && (
+                  {camp.status === 'pending_approval' && (
                     <button
                       onClick={() => handleApproveCampaign(camp._id)}
                       className="px-3.5 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center space-x-1 transition-all"
@@ -571,7 +571,7 @@ export const MerchantDashboard: React.FC = () => {
                     </button>
                   )}
 
-                  {camp.isApproved && camp.status !== 'active' && (
+                  {camp.status === 'approved' && (
                     <button
                       onClick={() => handleActivateCampaign(camp._id)}
                       className="px-3.5 py-1.5 rounded-full bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center space-x-1 transition-all"
@@ -597,7 +597,7 @@ export const MerchantDashboard: React.FC = () => {
       {activeTab === 'audit' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-900">Auditable Commerce Ledger</h3>
+            <h3 className="text-sm font-bold text-slate-900">AI-Assisted Commerce Audit Ledger</h3>
             <button
               onClick={fetchAuditLogs}
               className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -611,8 +611,10 @@ export const MerchantDashboard: React.FC = () => {
               <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-semibold">
                 <tr>
                   <th className="p-3.5">Action</th>
+                  <th className="p-3.5">Actor</th>
                   <th className="p-3.5">Status</th>
                   <th className="p-3.5">Entity Reference</th>
+                  <th className="p-3.5">Correlation ID</th>
                   <th className="p-3.5">Timestamp</th>
                 </tr>
               </thead>
@@ -620,14 +622,16 @@ export const MerchantDashboard: React.FC = () => {
                 {auditLogs.map((log) => (
                   <tr key={log._id} className="hover:bg-slate-50/50">
                     <td className="p-3.5 font-mono font-bold text-slate-900">{log.action}</td>
+                    <td className="p-3.5 text-slate-600">{log.actorType || 'system'}</td>
                     <td className="p-3.5">
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                         {log.status}
                       </span>
                     </td>
                     <td className="p-3.5 font-mono text-slate-500">{log.entityId || '-'}</td>
+                    <td className="p-3.5 font-mono text-slate-500">{log.correlationId || '-'}</td>
                     <td className="p-3.5 text-slate-400 font-mono">
-                      {new Date(log.createdAt).toLocaleTimeString()}
+                      {new Date(log.timestamp || log.createdAt).toLocaleTimeString()}
                     </td>
                   </tr>
                 ))}

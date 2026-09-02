@@ -3,6 +3,7 @@ import { Product } from '../models/Product';
 import { Merchant } from '../models/Merchant';
 import { User } from '../models/User';
 import bcrypt from 'bcryptjs';
+import { config } from '../config/env';
 
 export interface SeedProductDef {
   name: string;
@@ -166,7 +167,7 @@ export const DEMO_CATALOG: SeedProductDef[] = [
 
 export class SeedService {
   public static async seedCatalogIfEmpty(): Promise<{ seededCount: number; totalCount: number }> {
-    if (mongoose.connection.readyState === 0) {
+    if (mongoose.connection.readyState === 0 || config.isProduction) {
       return { seededCount: 0, totalCount: 0 };
     }
 
@@ -194,6 +195,11 @@ export class SeedService {
           maxTransactionAmount: 100000,
           approvalRequired: false,
         });
+      }
+
+      if (!merchantUser.merchantId || merchantUser.merchantId.toString() !== merchant._id.toString()) {
+        merchantUser.merchantId = merchant._id;
+        await merchantUser.save();
       }
 
       let seededCount = 0;

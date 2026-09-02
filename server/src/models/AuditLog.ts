@@ -4,6 +4,10 @@ export interface IAuditLog extends Document {
   userId?: mongoose.Types.ObjectId;
   merchantId?: mongoose.Types.ObjectId;
   action: string;
+  eventType?: string;
+  actorType?: 'buyer' | 'buyer_agent' | 'merchant' | 'merchant_agent' | 'system';
+  actorId?: string;
+  correlationId?: string;
   entityType?: string;
   entityId?: string;
   status: 'success' | 'failed' | 'pending' | 'rejected';
@@ -27,6 +31,13 @@ const AuditLogSchema: Schema<IAuditLog> = new Schema(
       required: true,
       index: true,
     },
+    eventType: { type: String, index: true },
+    actorType: {
+      type: String,
+      enum: ['buyer', 'buyer_agent', 'merchant', 'merchant_agent', 'system'],
+    },
+    actorId: { type: String },
+    correlationId: { type: String, index: true },
     entityType: {
       type: String,
     },

@@ -18,6 +18,10 @@ export class AuthController {
         throw new CustomError('Password must be at least 6 characters', 400, 'INVALID_REQUEST');
       }
 
+      if (role !== 'customer' && role !== 'merchant') {
+        throw new CustomError('Registration is limited to customer or merchant accounts', 400, 'INVALID_REQUEST');
+      }
+
       const existingUser = await User.findOne({ email: email.toLowerCase() });
       if (existingUser) {
         throw new CustomError('An account with this email already exists', 409, 'USER_EXISTS');
@@ -134,7 +138,7 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          merchant: user.merchantId,
+          merchantId: user.merchantId,
         },
       });
     } catch (error) {

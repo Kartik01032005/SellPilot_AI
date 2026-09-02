@@ -54,6 +54,7 @@ interface AIChatModalProps {
   onClose: () => void;
   initialMode?: 'buyer' | 'merchant';
   onOpenCheckout?: () => void;
+  onCorrelationId?: (correlationId: string) => void;
 }
 
 export const AIChatModal: React.FC<AIChatModalProps> = ({
@@ -61,6 +62,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   onClose,
   initialMode = 'buyer',
   onOpenCheckout,
+  onCorrelationId,
 }) => {
   const { user } = useAuth();
   const { addItem } = useCart();
@@ -71,6 +73,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [correlationId, setCorrelationId] = useState<string | undefined>(undefined);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +144,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         crossSells?: any[];
         requiresConfirmation?: boolean;
         conversationId?: string;
+        correlationId?: string;
       }>('/api/ai/chat', {
         method: 'POST',
         body: JSON.stringify({
@@ -148,12 +152,17 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           mode,
           language,
           conversationId,
+          correlationId,
         }),
       });
 
       if (res.success) {
         if (res.conversationId) {
           setConversationId(res.conversationId);
+        }
+        if (res.correlationId) {
+          setCorrelationId(res.correlationId);
+          onCorrelationId?.(res.correlationId);
         }
 
         const agentMsg: ChatMessage = {
