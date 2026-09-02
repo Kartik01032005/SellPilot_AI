@@ -75,6 +75,37 @@ export interface ChatResponseResult {
  */
 const sessionRecentProducts: Map<string, Array<{ id: string; name: string; price: number; stock: number }>> = new Map();
 
+const cacheRecentProducts = (
+  sessionKey: string,
+  context: AgentToolContext,
+  products: Array<{ id: string; name: string; price: number; stock: number }>
+) => {
+  sessionRecentProducts.set(sessionKey, products);
+  if (context.conversationId) {
+    sessionRecentProducts.set(context.conversationId, products);
+  }
+  if (context.userId) {
+    sessionRecentProducts.set(context.userId, products);
+  }
+};
+
+const getRecentProducts = (
+  sessionKey: string,
+  context: AgentToolContext
+): Array<{ id: string; name: string; price: number; stock: number }> => {
+  if (context.conversationId && sessionRecentProducts.has(context.conversationId)) {
+    return sessionRecentProducts.get(context.conversationId)!;
+  }
+  if (sessionRecentProducts.has(sessionKey)) {
+    return sessionRecentProducts.get(sessionKey)!;
+  }
+  if (context.userId && sessionRecentProducts.has(context.userId)) {
+    return sessionRecentProducts.get(context.userId)!;
+  }
+  return [];
+};
+
+
 export class AgentService {
   /**
    * Main Agent Reasoning and Tool Execution Gateway
@@ -99,7 +130,6 @@ export class AgentService {
     // 2. Conversation Context Resolution
     let conversation = null;
     let conversationWasCreated = false;
-    const sessionKey = params.conversationId || params.userId || 'default_session';
 
     if (mongoose.connection.readyState !== 0) {
       if (params.conversationId && mongoose.Types.ObjectId.isValid(params.conversationId)) {
@@ -130,11 +160,14 @@ export class AgentService {
       }
     }
 
+    const resolvedConversationId = conversation?._id?.toString() || params.conversationId;
+    const sessionKey = resolvedConversationId || params.userId || 'default_session';
+
     const context: AgentToolContext = {
       userId: params.userId,
       merchantId: params.merchantId || (mode === 'merchant' ? params.userId : undefined),
       userRole: params.userRole || (mode === 'merchant' ? 'merchant' : 'customer'),
-      conversationId: conversation?._id?.toString() || params.conversationId,
+      conversationId: resolvedConversationId,
       language: finalLanguage,
       correlationId,
     };
@@ -228,20 +261,26 @@ export class AgentService {
     if (intent === 'ADD_TO_CART') {
       let targetIdentifier: string | undefined = requirements.targetProductName;
       let targetProductFromContext: { id: string; name: string } | undefined;
+      const recentList = getRecentProducts(sessionKey, context);
 
       // Handle ordinal references (e.g. "add the second one")
       if (requirements.targetOrdinal) {
-        const recentList = sessionRecentProducts.get(sessionKey) || [];
         const index = requirements.targetOrdinal - 1;
         if (recentList[index]) {
           targetProductFromContext = recentList[index];
           targetIdentifier = targetProductFromContext.id;
         }
+      } else if (requirements.isCheapestRequested) {
+        // Handle cheapest selection (e.g. "add the cheapest one to my cart")
+        if (recentList.length > 0) {
+          const sorted = [...recentList].sort((a, b) => a.price - b.price);
+          targetProductFromContext = sorted[0];
+          targetIdentifier = targetProductFromContext.id;
+        }
       }
 
-      // If no ordinal matched, check if keywords or category identify a single item or recent item
+      // If no ordinal or cheapest matched, check if keywords or category identify a single item or recent item
       if (!targetIdentifier) {
-        const recentList = sessionRecentProducts.get(sessionKey) || [];
         if (recentList.length > 0) {
           targetProductFromContext = recentList[0];
           targetIdentifier = targetProductFromContext.id;
@@ -250,12 +289,14 @@ export class AgentService {
         }
       }
 
+      const isId = !!targetIdentifier && (mongoose.Types.ObjectId.isValid(targetIdentifier) || targetIdentifier.startsWith('mock_'));
+
       // Step A: Check inventory tool
       const invResult = await ToolExecutionService.executeTool({
         toolName: 'checkInventory',
         arguments: {
-          productId: mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
-          name: !mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          productId: isId ? targetIdentifier : undefined,
+          name: !isId ? targetIdentifier : targetProductFromContext?.name,
           requestedQuantity: requirements.quantity || 1,
         },
         context,
@@ -275,8 +316,8 @@ export class AgentService {
       const addResult = await ToolExecutionService.executeTool({
         toolName: 'addToCart',
         arguments: {
-          productId: mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
-          name: !mongoose.Types.ObjectId.isValid(targetIdentifier) ? targetIdentifier : undefined,
+          productId: isId ? targetIdentifier : undefined,
+          name: !isId ? targetIdentifier : targetProductFromContext?.name,
           quantity: requirements.quantity || 1,
           conversationId: context.conversationId,
           userId: context.userId,
@@ -323,7 +364,7 @@ export class AgentService {
           language,
           mode: 'buyer',
           cart: {
-            items: [addResult.data.addedItem],
+            items: addResult.data.items || [addResult.data.addedItem],
             totalItems: addResult.data.totalItems,
             subtotal: addResult.data.subtotal,
             currency: addResult.data.addedItem.currency,
@@ -443,8 +484,9 @@ export class AgentService {
           ? `The cheapest available option is ${cheapest.name} at ₹${cheapest.price.toLocaleString('en-IN')}.`
           : `Comparing ${items.length} options: ${items.map((it: any) => `${it.name} (₹${it.price})`).join(' vs ')}.`;
 
-        sessionRecentProducts.set(
+        cacheRecentProducts(
           sessionKey,
+          context,
           items.map((p: any) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock }))
         );
 
@@ -472,7 +514,7 @@ export class AgentService {
 
     // CASE 6: Cross-sell / "What else should I buy with it?"
     if (intent === 'CROSS_SELL') {
-      const recentList = sessionRecentProducts.get(sessionKey) || [];
+      const recentList = getRecentProducts(sessionKey, context);
       const primaryProduct = recentList[0];
 
       const crossResult = await ToolExecutionService.executeTool({
@@ -515,7 +557,7 @@ export class AgentService {
 
     // CASE 7: Upsell Request
     if (intent === 'UPSELL') {
-      const recentList = sessionRecentProducts.get(sessionKey) || [];
+      const recentList = getRecentProducts(sessionKey, context);
       const primaryProduct = recentList[0];
 
       const upsellResult = await ToolExecutionService.executeTool({
@@ -582,8 +624,9 @@ export class AgentService {
       });
 
       // Cache recent search products for referential queries like "add the second one"
-      sessionRecentProducts.set(
+      cacheRecentProducts(
         sessionKey,
+        context,
         foundProducts.map((p) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock }))
       );
     }

@@ -35,6 +35,7 @@ interface CartContextType {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  syncCart: (serverItems: Array<{ productId: string; name: string; price: number; quantity?: number; category?: string; image?: string }>) => void;
   preparedCheckout: PreparedCheckout | null;
   prepareCheckoutLoading: boolean;
   refreshPreparedCheckout: () => Promise<PreparedCheckout | null>;
@@ -189,6 +190,48 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const syncCart = useCallback(
+    (
+      serverItems: Array<{
+        productId: string;
+        name: string;
+        price: number;
+        quantity?: number;
+        category?: string;
+        image?: string;
+      }>
+    ) => {
+      if (!Array.isArray(serverItems) || serverItems.length === 0) return;
+      setItems((prev) => {
+        const next = [...prev];
+        for (const sItem of serverItems) {
+          const qty = sItem.quantity && sItem.quantity > 0 ? sItem.quantity : 1;
+          const existingIdx = next.findIndex((it) => it.productId === sItem.productId);
+          if (existingIdx >= 0) {
+            next[existingIdx] = {
+              ...next[existingIdx],
+              name: sItem.name || next[existingIdx].name,
+              price: sItem.price ?? next[existingIdx].price,
+              quantity: qty,
+              category: sItem.category || next[existingIdx].category,
+            };
+          } else {
+            next.push({
+              productId: sItem.productId,
+              name: sItem.name,
+              price: sItem.price,
+              quantity: qty,
+              category: sItem.category,
+              image: sItem.image,
+            });
+          }
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   const itemCount = items.reduce((acc, it) => acc + it.quantity, 0);
 
   return (
@@ -202,6 +245,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         removeItem,
         updateQuantity,
         clearCart,
+        syncCart,
         preparedCheckout,
         prepareCheckoutLoading,
         refreshPreparedCheckout,

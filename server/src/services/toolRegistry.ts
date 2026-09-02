@@ -548,6 +548,7 @@ const addToCartTool: AgentTool<
     return {
       success: true,
       addedItem,
+      items: cart.items,
       totalItems,
       subtotal,
     };

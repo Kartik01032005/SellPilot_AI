@@ -234,6 +234,69 @@ describe('Step 8 — Real Agent Tool Execution & Safety Engine', () => {
       expect(usedTools).toContain('addToCart');
     });
 
+    it('executes search products and then adds the cheapest one to cart without losing productId', async () => {
+      const searchRes = await request(app)
+        .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          message: 'Find running shoes under ₹3000',
+          mode: 'buyer',
+        });
+
+      expect(searchRes.status).toBe(200);
+      expect(searchRes.body.success).toBe(true);
+
+      const convId = searchRes.body.conversationId;
+
+      const addRes = await request(app)
+        .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          message: 'Add the cheapest one to my cart',
+          mode: 'buyer',
+          conversationId: convId,
+        });
+
+      expect(addRes.status).toBe(200);
+      expect(addRes.body.success).toBe(true);
+      expect(addRes.body.intent).toBe('ADD_TO_CART');
+      expect(addRes.body.cart).toBeDefined();
+      expect(addRes.body.cart.items.length).toBe(1);
+
+      const usedTools = addRes.body.toolsExecuted.map((t: any) => t.tool);
+      expect(usedTools).toContain('checkInventory');
+      expect(usedTools).toContain('addToCart');
+    });
+
+    it('synchronizes and returns complete cart state with items and totals upon AI addToCart', async () => {
+      const addRes = await request(app)
+        .post('/api/ai/chat')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          message: 'Add Pro Running Shoes to my cart',
+          mode: 'buyer',
+          conversationId: 'conv_cart_sync_regression',
+        });
+
+      expect(addRes.status).toBe(200);
+      expect(addRes.body.success).toBe(true);
+      expect(addRes.body.intent).toBe('ADD_TO_CART');
+      expect(addRes.body.cart).toBeDefined();
+      expect(Array.isArray(addRes.body.cart.items)).toBe(true);
+      expect(addRes.body.cart.items.length).toBeGreaterThanOrEqual(1);
+      expect(addRes.body.cart.totalItems).toBeGreaterThanOrEqual(1);
+      expect(addRes.body.cart.subtotal).toBeGreaterThan(0);
+      expect(addRes.body.cart.items[0]).toEqual(
+        expect.objectContaining({
+          productId: expect.any(String),
+          name: expect.any(String),
+          price: expect.any(Number),
+          quantity: expect.any(Number),
+        })
+      );
+    });
+
+
     it('executes getCart when user asks to view cart contents', async () => {
       // Seed an item first
       await ConversationCartService.addItem('Pro Running Shoes', 1, customerUserId, 'conv_view_test');

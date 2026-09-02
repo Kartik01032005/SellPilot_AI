@@ -65,7 +65,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   onCorrelationId,
 }) => {
   const { user } = useAuth();
-  const { addItem } = useCart();
+  const { addItem, syncCart } = useCart();
   const { language, languageNames } = useLanguage();
 
   const [mode, setMode] = useState<'buyer' | 'merchant'>(initialMode);
@@ -142,6 +142,18 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         products?: any[];
         upsell?: any;
         crossSells?: any[];
+        cart?: {
+          items: Array<{
+            productId: string;
+            name: string;
+            price: number;
+            quantity: number;
+            category?: string;
+          }>;
+          totalItems: number;
+          subtotal: number;
+          currency?: string;
+        };
         requiresConfirmation?: boolean;
         conversationId?: string;
         correlationId?: string;
@@ -163,6 +175,10 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         if (res.correlationId) {
           setCorrelationId(res.correlationId);
           onCorrelationId?.(res.correlationId);
+        }
+
+        if (res.cart?.items && Array.isArray(res.cart.items) && res.cart.items.length > 0) {
+          syncCart(res.cart.items);
         }
 
         const agentMsg: ChatMessage = {
