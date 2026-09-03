@@ -3,6 +3,7 @@ import { MerchantService } from '../services/merchantService';
 import { ProductService } from '../services/productService';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
+import { User } from '../models/User';
 
 export class MerchantController {
   public static async getInsights(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -25,7 +26,10 @@ export class MerchantController {
 
   public static async getMerchantProducts(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const merchantId = req.user?.merchantId || req.user?.userId;
+      const authenticatedUser = req.user
+        ? await User.findById(req.user.userId).select('merchantId role').lean()
+        : null;
+      const merchantId = authenticatedUser?.merchantId?.toString() || req.user?.merchantId;
       if (!merchantId) {
         throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
       }

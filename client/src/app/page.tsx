@@ -174,7 +174,8 @@ export default function HomePage() {
       if (maxPriceFilter < 100000) queryParams.append('maxPrice', maxPriceFilter.toString());
 
       const res = await ApiClient.request<{ success: boolean; products: ProductItem[] }>(
-        `/api/products?${queryParams.toString()}`
+        `/api/products?${queryParams.toString()}`,
+        { cache: 'no-store' }
       );
 
       if (res.success && res.products && res.products.length >= 6) {

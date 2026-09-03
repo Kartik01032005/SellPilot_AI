@@ -201,6 +201,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       };
 
       let paymentFailureReported = false;
+      let paymentCallbackReceived = false;
 
       const razorpay = new window.Razorpay({
         key: paymentOrderRes.keyId,
@@ -209,15 +210,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         name: 'SellPilot AI',
         description: 'Demo Payment - Razorpay Test Mode',
         order_id: paymentOrderRes.razorpayOrderId,
-        handler: (response) => void verifyPayment(response).catch((err) => {
-          setStep('failed');
-          setErrorMessage(err instanceof Error ? err.message : 'Payment verification failed');
-        }),
+        handler: (response) => {
+          paymentCallbackReceived = true;
+          void verifyPayment(response).catch((err) => {
+            setStep('failed');
+            setErrorMessage(err instanceof Error ? err.message : 'Payment verification failed');
+          });
+        },
         modal: {
           ondismiss: () => {
-            if (!paymentFailureReported) {
-              cancelPayment();
-            }
+            if (paymentCallbackReceived) return;
+            if (!paymentFailureReported) cancelPayment();
             setStep('failed');
             setErrorMessage(paymentFailureReported
               ? 'Payment failed. No order was marked as paid.'

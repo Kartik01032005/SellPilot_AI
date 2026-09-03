@@ -8,6 +8,7 @@ import {
   Package,
   Sparkles,
   Plus,
+  Pencil,
   Trash2,
   CheckCircle2,
   Layers,
@@ -18,6 +19,15 @@ import {
   History,
   X,
 } from 'lucide-react';
+
+const getId = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const candidate = value as { _id?: unknown; $oid?: unknown };
+    return getId(candidate._id ?? candidate.$oid);
+  }
+  return undefined;
+};
 
 export const MerchantDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -31,6 +41,7 @@ export const MerchantDashboard: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [newProdName, setNewProdName] = useState('');
   const [newProdCategory, setNewProdCategory] = useState('Shoes');
   const [newProdPrice, setNewProdPrice] = useState('');
@@ -65,14 +76,19 @@ export const MerchantDashboard: React.FC = () => {
   const fetchProducts = async () => {
     setProductsLoading(true);
     try {
-      const res = await ApiClient.request<{ success: boolean; products: any[] }>('/api/merchant/products');
-      if (res.success && res.products) {
-        setProducts(res.products);
+      const res = await ApiClient.request<{ success: boolean; products: any[] }>('/api/products');
+      const apiProducts = Array.isArray(res.products) ? res.products : [];
+      const merchantId = getId(user?.merchantId);
+      const merchantProducts = merchantId
+        ? apiProducts.filter((product) => getId(product.merchantId) === merchantId)
+        : apiProducts;
+
+      if (res.success) {
+        setProducts(merchantProducts);
       } else {
-        const fallbackRes = await ApiClient.request<{ success: boolean; products: any[] }>('/api/products');
-        if (fallbackRes.success) setProducts(fallbackRes.products || []);
+        setProducts([]);
       }
-    } catch {
+    } catch (error) {
       // Ignore
     } finally {
       setProductsLoading(false);
@@ -106,13 +122,15 @@ export const MerchantDashboard: React.FC = () => {
     fetchProducts();
     fetchCampaigns();
     fetchAuditLogs();
-  }, []);
+  }, [user?.id, getId(user?.merchantId)]);
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isEditing = Boolean(editingProduct?._id);
     try {
-      const res = await ApiClient.request<{ success: boolean }>('/api/products', {
-        method: 'POST',
+      const endpoint = isEditing ? `/api/products/${editingProduct?._id}` : '/api/products';
+      const res = await ApiClient.request<{ success: boolean }>(endpoint, {
+        method: isEditing ? 'PUT' : 'POST',
         body: JSON.stringify({
           name: newProdName,
           category: newProdCategory,
@@ -124,6 +142,7 @@ export const MerchantDashboard: React.FC = () => {
 
       if (res.success) {
         setIsAddProductOpen(false);
+        setEditingProduct(null);
         setNewProdName('');
         setNewProdPrice('');
         setNewProdStock('');
@@ -132,8 +151,18 @@ export const MerchantDashboard: React.FC = () => {
         fetchInsights();
       }
     } catch {
-      alert('Error creating product');
+      alert(isEditing ? 'Error updating product' : 'Error creating product');
     }
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setNewProdName(product.name || '');
+    setNewProdCategory(product.category || 'Shoes');
+    setNewProdPrice(String(product.price ?? ''));
+    setNewProdStock(String(product.stock ?? ''));
+    setNewProdFeatures(Array.isArray(product.features) ? product.features.join(', ') : '');
+    setIsAddProductOpen(true);
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -143,8 +172,11 @@ export const MerchantDashboard: React.FC = () => {
         method: 'DELETE',
       });
       if (res.success) {
+        setProducts((prev) => prev.filter((product) => String(product._id) !== String(id)));
         fetchProducts();
         fetchInsights();
+      } else {
+        alert(res.message || 'Unable to delete product');
       }
     } catch {
       alert('Error deleting product');
@@ -488,13 +520,22 @@ export const MerchantDashboard: React.FC = () => {
                       <span className="text-[10px] uppercase font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200/60">
                         {p.category}
                       </span>
-                      <button
-                        onClick={() => handleDeleteProduct(p._id)}
-                        className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
-                        title="Delete product"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditProduct(p)}
+                          className="text-slate-400 hover:text-brand-600 p-1 transition-colors"
+                          title="Edit product"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p._id)}
+                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                          title="Delete product"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <h4 className="text-xs font-bold text-slate-900 truncate">{p.name}</h4>
                     <p className="text-xs text-slate-500 mt-1 line-clamp-2 font-medium">
@@ -646,8 +687,14 @@ export const MerchantDashboard: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in font-sans">
           <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900 text-base">Add New Product</h3>
-              <button onClick={() => setIsAddProductOpen(false)} className="text-slate-400 hover:text-slate-700">
+              <h3 className="font-bold text-slate-900 text-base">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
+              <button
+                onClick={() => {
+                  setIsAddProductOpen(false);
+                  setEditingProduct(null);
+                }}
+                className="text-slate-400 hover:text-slate-700"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -714,7 +761,7 @@ export const MerchantDashboard: React.FC = () => {
                 type="submit"
                 className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm mt-3 active:scale-95 transition-all"
               >
-                Publish Product
+                {editingProduct ? 'Save Changes' : 'Publish Product'}
               </button>
             </form>
           </div>

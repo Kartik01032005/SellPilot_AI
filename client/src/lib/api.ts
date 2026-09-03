@@ -62,12 +62,13 @@ export class ApiClient {
 
       const data = await response.json();
       if (!response.ok) {
-        return {
+        const returnedValue = {
           success: false,
           message: data.message || `Request failed with status ${response.status}`,
           code: data.code || 'API_ERROR',
           ...data,
         } as ApiResponse<T>;
+        return returnedValue;
       }
 
       return data as ApiResponse<T>;

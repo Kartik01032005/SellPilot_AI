@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "rimraf dist && tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
+    "seed": "ts-node --transpile-only src/scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest --detectOpenHandles --forceExit"
   },

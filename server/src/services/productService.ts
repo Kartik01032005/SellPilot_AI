@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import { Product, IProduct } from '../models/Product';
 import { CustomError } from '../middleware/errorHandler';
-import { config } from '../config/env';
-import { SeedService } from './seedService';
 
 export interface ProductFilterParams {
   merchantId?: string;
@@ -56,13 +54,6 @@ export class ProductService {
   }
 
   public static async getProducts(filters: ProductFilterParams): Promise<IProduct[]> {
-    if (mongoose.connection.readyState !== 0 && !config.isTest && !config.isProduction) {
-      const count = await Product.countDocuments();
-      if (count === 0) {
-        await SeedService.seedCatalogIfEmpty();
-      }
-    }
-
     const query: Record<string, unknown> = { isActive: true };
 
     if (filters.merchantId) {
@@ -143,7 +134,7 @@ export class ProductService {
     return await product.save();
   }
 
-  public static async deleteProduct(id: string, merchantId: string): Promise<boolean> {
+  public static async deleteProduct(id: string, merchantId: string): Promise<IProduct> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new CustomError('Invalid product ID', 400, 'INVALID_REQUEST');
     }
@@ -157,9 +148,21 @@ export class ProductService {
       throw new CustomError('Not authorized to delete this product', 403, 'FORBIDDEN');
     }
 
-    product.isActive = false;
-    await product.save();
-    return true;
+    if (!product.isActive) {
+      throw new CustomError('Product not found', 404, 'NOT_FOUND');
+    }
+
+    const deleted = await Product.findOneAndUpdate(
+      { _id: id, merchantId, isActive: true },
+      { $set: { isActive: false } },
+      { new: true }
+    ).exec();
+
+    if (!deleted) {
+      throw new CustomError('Product not found', 404, 'NOT_FOUND');
+    }
+
+    return deleted;
   }
 
   public static async validateStock(productId: string, quantity: number): Promise<{

@@ -84,4 +84,7 @@ const ProductSchema: Schema<IProduct> = new Schema(
   }
 );
 
+// Seeded products use SKU as their stable identity within a merchant.
+ProductSchema.index({ merchantId: 1, sku: 1 }, { unique: true, sparse: true });
+
 export const Product = mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);

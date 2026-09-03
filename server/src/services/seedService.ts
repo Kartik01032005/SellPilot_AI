@@ -37,7 +37,7 @@ export const DEMO_CATALOG: SeedProductDef[] = [
     category: 'Shoes',
     price: 2499,
     currency: 'INR',
-    stock: 8,
+    stock: 5,
     sku: 'SHOE-ULTRA-GRIP',
     features: ['All-Weather Grip', 'Dual-Density Foam', 'Reflective Strips'],
     tags: ['running', 'road', 'shoes'],
@@ -133,7 +133,7 @@ export const DEMO_CATALOG: SeedProductDef[] = [
     category: 'Accessories',
     price: 299,
     currency: 'INR',
-    stock: 50,
+    stock: 49,
     sku: 'ACC-SCR-PROT',
     features: ['9H Hardness', 'Oleophobic Coating', 'Bubble-Free Install'],
     tags: ['screen protector', 'tempered glass', 'accessories'],
@@ -163,43 +163,71 @@ export const DEMO_CATALOG: SeedProductDef[] = [
     tags: ['shorts', 'running', 'clothing'],
     relatedSkus: ['SHOE-PRO-CARBON', 'CLO-DRIFIT-JRSY'],
   },
+  {
+    name: 'QA Pro Running Carbon X',
+    description: 'Verified catalog item.',
+    category: 'Shoes',
+    price: 2999,
+    currency: 'INR',
+    stock: 48,
+    sku: 'QA-SHOE-CARBON-X-01',
+    features: [],
+    tags: ['qa', 'running', 'shoes'],
+  },
+  {
+    name: 'QA Pro Running Carbon X',
+    description: 'Verified catalog item.',
+    category: 'Shoes',
+    price: 2999,
+    currency: 'INR',
+    stock: 48,
+    sku: 'QA-SHOE-CARBON-X-02',
+    features: [],
+    tags: ['qa', 'running', 'shoes'],
+  },
 ];
 
 export class SeedService {
-  public static async seedCatalogIfEmpty(): Promise<{ seededCount: number; totalCount: number }> {
+  public static async seedCatalogIfEmpty(merchantId?: string): Promise<{ seededCount: number; totalCount: number }> {
     if (mongoose.connection.readyState === 0 || config.isProduction) {
       return { seededCount: 0, totalCount: 0 };
     }
 
     try {
-      // Find or create default merchant
-      let merchantUser = await User.findOne({ email: 'merchant@sellpilot.ai' });
-      if (!merchantUser) {
-        const hashedPassword = await bcrypt.hash('merchant123', 10);
-        merchantUser = await User.create({
-          name: 'Apex Sports & Tech Store',
-          email: 'merchant@sellpilot.ai',
-          password: hashedPassword,
-          role: 'merchant',
-        });
-      }
+      let merchant = merchantId && mongoose.Types.ObjectId.isValid(merchantId)
+        ? await Merchant.findById(merchantId)
+        : null;
 
-      let merchant = await Merchant.findOne({ email: 'merchant@sellpilot.ai' });
       if (!merchant) {
-        merchant = await Merchant.create({
-          name: 'Apex Sports & Tech Store',
-          email: 'merchant@sellpilot.ai',
-          businessName: 'Apex Store',
-          currency: 'INR',
-          maxDiscountPercentage: 25,
-          maxTransactionAmount: 100000,
-          approvalRequired: false,
-        });
-      }
+        // The CLI restore uses the demo merchant; authenticated callers pass their merchant ID.
+        let merchantUser = await User.findOne({ email: 'merchant@sellpilot.ai' });
+        if (!merchantUser) {
+          const hashedPassword = await bcrypt.hash('merchant123', 10);
+          merchantUser = await User.create({
+            name: 'Apex Sports & Tech Store',
+            email: 'merchant@sellpilot.ai',
+            password: hashedPassword,
+            role: 'merchant',
+          });
+        }
 
-      if (!merchantUser.merchantId || merchantUser.merchantId.toString() !== merchant._id.toString()) {
-        merchantUser.merchantId = merchant._id;
-        await merchantUser.save();
+        merchant = await Merchant.findOne({ email: 'merchant@sellpilot.ai' });
+        if (!merchant) {
+          merchant = await Merchant.create({
+            name: 'Apex Sports & Tech Store',
+            email: 'merchant@sellpilot.ai',
+            businessName: 'Apex Store',
+            currency: 'INR',
+            maxDiscountPercentage: 25,
+            maxTransactionAmount: 100000,
+            approvalRequired: false,
+          });
+        }
+
+        if (!merchantUser.merchantId || merchantUser.merchantId.toString() !== merchant._id.toString()) {
+          merchantUser.merchantId = merchant._id;
+          await merchantUser.save();
+        }
       }
 
       let seededCount = 0;
@@ -207,9 +235,7 @@ export class SeedService {
 
       // Ensure all demo products exist
       for (const def of DEMO_CATALOG) {
-        let existing = await Product.findOne({
-          $or: [{ sku: def.sku }, { name: def.name }],
-        });
+        let existing = await Product.findOne({ merchantId: merchant._id, sku: def.sku });
 
         if (!existing) {
           existing = await Product.create({
@@ -258,12 +284,12 @@ export class SeedService {
         }
       }
 
-      const totalCount = await Product.countDocuments({ isActive: true });
+      const totalCount = await Product.countDocuments({ merchantId: merchant._id, isActive: true });
       console.log(`[SeedService] Catalog status: ${seededCount} new products seeded, total ${totalCount} active products.`);
       return { seededCount, totalCount };
     } catch (err) {
-      console.error('[SeedService] Error during auto-seeding:', err);
-      return { seededCount: 0, totalCount: 0 };
+      console.error('[SeedService] Error during catalog restore:', err);
+      throw err;
     }
   }
 }

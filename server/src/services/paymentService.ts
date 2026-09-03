@@ -160,6 +160,10 @@ export class PaymentService {
       throw new CustomError('Payment transaction not found', 404, 'NOT_FOUND');
     }
 
+    if (payment.razorpayOrderId !== razorpayOrderId) {
+      throw new CustomError('Payment callback does not match the current Razorpay order', 400, 'PAYMENT_ORDER_MISMATCH');
+    }
+
     const order = await Order.findById(payment.orderId);
     if (!order) {
       throw new CustomError('Associated order not found', 404, 'NOT_FOUND');
@@ -167,16 +171,6 @@ export class PaymentService {
 
     if (userId && order.userId && order.userId.toString() !== userId) {
       throw new CustomError('Not authorized to verify this payment', 403, 'FORBIDDEN');
-    }
-
-    // Duplicate Operation Protection: If already verified and paid, return idempotently
-    if (payment.status === 'paid' && payment.verificationStatus === 'verified') {
-      return {
-        success: true,
-        verified: true,
-        status: 'paid',
-        orderId: order._id.toString(),
-      };
     }
 
     // Verify HMAC SHA256 signature
@@ -216,6 +210,34 @@ export class PaymentService {
       });
 
       throw new CustomError('Payment verification failed: invalid signature', 400, 'PAYMENT_NOT_VERIFIED');
+    }
+
+    // Confirm with Razorpay that this callback identifies a real payment for this order.
+    let razorpayPayment: { order_id?: string; status?: string; amount?: number; currency?: string };
+    try {
+      const razorpay = this.getRazorpayInstance();
+      razorpayPayment = await razorpay.payments.fetch(razorpayPaymentId) as typeof razorpayPayment;
+    } catch {
+      throw new CustomError('Payment verification failed: Razorpay payment could not be confirmed', 400, 'PAYMENT_NOT_VERIFIED');
+    }
+
+    const expectedAmount = Math.round(payment.amount * 100);
+    const paymentIsForCurrentOrder = razorpayPayment.order_id === razorpayOrderId;
+    const paymentIsSettled = razorpayPayment.status === 'captured' || razorpayPayment.status === 'authorized';
+    const paymentAmountMatches = razorpayPayment.amount === expectedAmount;
+    const paymentCurrencyMatches = !razorpayPayment.currency || razorpayPayment.currency === payment.currency;
+    if (!paymentIsForCurrentOrder || !paymentIsSettled || !paymentAmountMatches || !paymentCurrencyMatches) {
+      throw new CustomError('Payment verification failed: Razorpay payment is not valid for this order', 400, 'PAYMENT_NOT_VERIFIED');
+    }
+
+    // Duplicate Operation Protection: only return idempotently after callback and server verification.
+    if (payment.status === 'paid' && payment.verificationStatus === 'verified') {
+      return {
+        success: true,
+        verified: true,
+        status: 'paid',
+        orderId: order._id.toString(),
+      };
     }
 
     // Claim the verification once so concurrent Razorpay callbacks cannot both deduct stock.

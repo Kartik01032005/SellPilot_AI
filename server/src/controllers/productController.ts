@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { ProductService } from '../services/productService';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
@@ -44,7 +45,10 @@ export class ProductController {
 
   public static async createProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const merchantId = req.user?.merchantId || req.user?.userId;
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || !mongoose.Types.ObjectId.isValid(merchantId)) {
+        throw new CustomError('A valid authenticated merchantId is required', 403, 'MERCHANT_ID_REQUIRED');
+      }
       const { name, description, category, price, currency, stock, sku, features, tags, relatedProducts } = req.body;
 
       const product = await ProductService.createProduct({
@@ -74,9 +78,9 @@ export class ProductController {
   public static async updateProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const merchantId = req.user?.merchantId || req.user?.userId;
-      if (!merchantId) {
-        throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || !mongoose.Types.ObjectId.isValid(merchantId)) {
+        throw new CustomError('A valid authenticated merchantId is required', 403, 'MERCHANT_ID_REQUIRED');
       }
 
       const updated = await ProductService.updateProduct(id, merchantId, req.body);
@@ -94,16 +98,17 @@ export class ProductController {
   public static async deleteProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const merchantId = req.user?.merchantId || req.user?.userId;
-      if (!merchantId) {
-        throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || !mongoose.Types.ObjectId.isValid(merchantId)) {
+        throw new CustomError('A valid authenticated merchantId is required', 403, 'MERCHANT_ID_REQUIRED');
       }
 
-      await ProductService.deleteProduct(id, merchantId);
+      const product = await ProductService.deleteProduct(id, merchantId);
 
       res.status(200).json({
         success: true,
         message: 'Product deleted successfully',
+        product,
       });
     } catch (error) {
       next(error);
@@ -127,7 +132,7 @@ export class ProductController {
 
   public static async seedProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await SeedService.seedCatalogIfEmpty();
+      const result = await SeedService.seedCatalogIfEmpty(req.user?.merchantId);
 
       res.status(200).json({
         success: true,

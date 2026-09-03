@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { ApiClient } from '@/lib/api';
+import { useAuth } from './AuthContext';
+import { getCartStorageKey } from './cartStorage';
 
 export interface CartItem {
   productId: string;
@@ -44,12 +46,15 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
   // Always initialize as empty array to match server-side render during hydration
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [preparedCheckout, setPreparedCheckout] = useState<PreparedCheckout | null>(null);
   const [prepareCheckoutLoading, setPrepareCheckoutLoading] = useState<boolean>(false);
   const isMountedRef = useRef(false);
+  const previousUserIdRef = useRef<string | null>(null);
+  const cartStorageKey = getCartStorageKey(user?.id);
 
   const refreshPreparedCheckout = useCallback(async (): Promise<PreparedCheckout | null> => {
     if (items.length === 0) {
@@ -107,17 +112,30 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [items]);
 
-  // Synchronize with localStorage after mount
+  // Load only the current authenticated user's cart; anonymous carts are session-local.
   useEffect(() => {
+    if (authLoading) return;
+
+    const userId = user?.id || null;
+    if (previousUserIdRef.current !== userId) {
+      previousUserIdRef.current = userId;
+      isMountedRef.current = false;
+      setItems([]);
+      setPreparedCheckout(null);
+    }
+
     if (!isMountedRef.current) {
       isMountedRef.current = true;
       try {
-        const saved = localStorage.getItem('sellpilot_cart');
+        const saved = cartStorageKey ? localStorage.getItem(cartStorageKey) : null;
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setItems(parsed);
           }
+        }
+        if (!cartStorageKey) {
+          localStorage.removeItem('sellpilot_cart');
         }
       } catch {
         // Ignore
@@ -126,7 +144,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
-      localStorage.setItem('sellpilot_cart', JSON.stringify(items));
+      if (cartStorageKey) {
+        localStorage.setItem(cartStorageKey, JSON.stringify(items));
+      }
     } catch {
       // Ignore
     }
@@ -136,7 +156,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       setPreparedCheckout(null);
     }
-  }, [items, refreshPreparedCheckout]);
+  }, [authLoading, cartStorageKey, items, refreshPreparedCheckout, user?.id]);
 
   const addItem = (
     item: { productId: string; name: string; price: number; category?: string; image?: string },
@@ -173,7 +193,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setPreparedCheckout(null);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('sellpilot_cart');
+        if (cartStorageKey) {
+          localStorage.removeItem(cartStorageKey);
+        }
       } catch {
         // Ignore
       }
