@@ -19,6 +19,28 @@ node_modules/
 !.env.example
 !**/.env.example
 
+# Credentials, certificates, and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.secret
+*.token
+credentials/
+secrets/
+**/credentials/
+**/secrets/
+*service-account*.json
+*firebase-adminsdk*.json
+
+# Local caches and generated metadata
+.cache/
+**/.cache/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
 # Build outputs
 .next/
 out/
