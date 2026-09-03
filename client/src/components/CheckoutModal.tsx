@@ -28,7 +28,12 @@ declare global {
         razorpay_signature: string;
       }) => void;
       modal?: { ondismiss?: () => void };
-    }) => { open: () => void };
+    }) => {
+      open: () => void;
+      on?: (event: 'payment.failed', handler: (response: {
+        error?: { description?: string; reason?: string };
+      }) => void) => void;
+    };
   }
 }
 
@@ -51,6 +56,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const idempotencyFingerprintRef = useRef<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -65,8 +71,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         throw new Error('Unable to confirm the server-authoritative total. Refresh the cart and try again.');
       }
 
-      if (!idempotencyKeyRef.current) {
+      const idempotencyFingerprint = JSON.stringify(items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })));
+
+      if (!idempotencyKeyRef.current || idempotencyFingerprintRef.current !== idempotencyFingerprint) {
         idempotencyKeyRef.current = globalThis.crypto?.randomUUID?.() || `checkout_${Date.now()}_${Math.random()}`;
+        idempotencyFingerprintRef.current = idempotencyFingerprint;
       }
 
       // 1. Create Order on Backend
@@ -84,10 +96,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         },
         idempotencyKey: idempotencyKeyRef.current,
         correlationId,
-        idempotencyFingerprint: JSON.stringify(items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        }))),
+        idempotencyFingerprint,
       };
 
       const orderRes = await ApiClient.request<{
@@ -169,6 +178,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         });
         clearCart();
         idempotencyKeyRef.current = null;
+        idempotencyFingerprintRef.current = null;
         setStep('success');
         onOrderSuccess(backendOrder._id);
       };
@@ -179,6 +189,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           body: JSON.stringify({ orderId: backendOrder._id }),
         });
       };
+
+      const recordPaymentFailure = (reason?: string) => {
+        void ApiClient.request('/api/payment/failure', {
+          method: 'POST',
+          body: JSON.stringify({
+            razorpayOrderId: paymentOrderRes.razorpayOrderId,
+            reason,
+          }),
+        });
+      };
+
+      let paymentFailureReported = false;
 
       const razorpay = new window.Razorpay({
         key: paymentOrderRes.keyId,
@@ -193,11 +215,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }),
         modal: {
           ondismiss: () => {
-            cancelPayment();
+            if (!paymentFailureReported) {
+              cancelPayment();
+            }
             setStep('failed');
-            setErrorMessage('Payment cancelled. No order was marked as paid.');
+            setErrorMessage(paymentFailureReported
+              ? 'Payment failed. No order was marked as paid.'
+              : 'Payment cancelled. No order was marked as paid.');
           },
         },
+      });
+      razorpay.on?.('payment.failed', (response) => {
+        paymentFailureReported = true;
+        recordPaymentFailure(response.error?.description || response.error?.reason);
+        setStep('failed');
+        setErrorMessage(response.error?.description || 'Payment failed. No order was marked as paid.');
       });
       razorpay.open();
     } catch (err) {

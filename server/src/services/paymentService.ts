@@ -333,6 +333,66 @@ export class PaymentService {
     };
   }
 
+  public static async recordPaymentFailure(
+    razorpayOrderId: string,
+    userId?: string,
+    reason?: string
+  ): Promise<{
+    success: boolean;
+    status: string;
+    orderId: string;
+  }> {
+    if (!razorpayOrderId) {
+      throw new CustomError('razorpayOrderId is required', 400, 'INVALID_REQUEST');
+    }
+
+    const payment = await Payment.findOne({ razorpayOrderId });
+    if (!payment) {
+      throw new CustomError('Payment transaction not found', 404, 'NOT_FOUND');
+    }
+
+    const order = await Order.findById(payment.orderId);
+    if (!order) {
+      throw new CustomError('Associated order not found', 404, 'NOT_FOUND');
+    }
+
+    if (userId && order.userId.toString() !== userId) {
+      throw new CustomError('Not authorized to update this payment', 403, 'FORBIDDEN');
+    }
+
+    if (payment.status !== 'paid') {
+      payment.status = 'failed';
+      payment.verificationStatus = 'failed';
+      await payment.save();
+    }
+
+    if (order.status !== 'paid' && order.status !== 'completed' && order.status !== 'cancelled') {
+      order.status = 'failed';
+      await order.save();
+    }
+
+    await AuditService.log({
+      userId,
+      merchantId: payment.merchantId,
+      action: 'payment_failed',
+      entityType: 'Payment',
+      entityId: payment._id.toString(),
+      amount: payment.amount,
+      status: 'failed',
+      eventType: 'payment_failed',
+      actorType: 'buyer_agent',
+      actorId: userId,
+      correlationId: order.correlationId,
+      metadata: { razorpayOrderId, reason },
+    });
+
+    return {
+      success: true,
+      status: 'failed',
+      orderId: order._id.toString(),
+    };
+  }
+
   public static async cancelPayment(
     orderId: string,
     userId?: string
@@ -363,9 +423,6 @@ export class PaymentService {
       payment.status = 'cancelled';
       await payment.save();
     }
-
-    order.status = 'cancelled';
-    await order.save();
 
     await AuditService.log({
       userId,

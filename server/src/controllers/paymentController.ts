@@ -58,6 +58,19 @@ export class PaymentController {
     }
   }
 
+  public static async recordPaymentFailure(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { razorpayOrderId, reason } = req.body;
+      const result = await PaymentService.recordPaymentFailure(razorpayOrderId, req.user?.userId, reason);
+
+      res.status(200).json({
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async cancelPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { orderId } = req.body;

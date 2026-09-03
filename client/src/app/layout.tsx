@@ -22,11 +22,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={manrope.variable}>
-      <head>
+    <html lang="en" className={manrope.variable} suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className="antialiased min-h-screen bg-[#fbfcfe] text-slate-900 font-sans selection:bg-brand-500 selection:text-white"
+      >
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
-      </head>
-      <body className="antialiased min-h-screen bg-[#fbfcfe] text-slate-900 font-sans selection:bg-brand-500 selection:text-white">
         <Providers>{children}</Providers>
       </body>
     </html>

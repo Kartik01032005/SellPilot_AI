@@ -44,18 +44,8 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('sellpilot_cart');
-        return saved ? JSON.parse(saved) : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
-
+  // Always initialize as empty array to match server-side render during hydration
+  const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [preparedCheckout, setPreparedCheckout] = useState<PreparedCheckout | null>(null);
   const [prepareCheckoutLoading, setPrepareCheckoutLoading] = useState<boolean>(false);
