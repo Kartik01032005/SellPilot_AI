@@ -62,13 +62,18 @@ export class RecommendationService {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
-    const upsellOption = await Product.findOne({
+    const upsellFilter: Record<string, unknown> = {
       category: currentProduct.category,
       price: { $gt: currentProduct.price, $lte: currentProduct.price * 2 },
       stock: { $gt: 0 },
       isActive: true,
       _id: { $ne: currentProduct._id },
-    }).sort({ price: 1 });
+    };
+    if (currentProduct.merchantId) {
+      upsellFilter.merchantId = currentProduct.merchantId;
+    }
+
+    const upsellOption = await Product.findOne(upsellFilter).sort({ price: 1 });
 
     if (!upsellOption) {
       return null;
@@ -90,13 +95,13 @@ export class RecommendationService {
       throw new CustomError('Invalid product ID', 400, 'INVALID_REQUEST');
     }
 
-    const currentProduct = await Product.findById(productId).populate('relatedProducts', 'name price category stock currency isActive');
+    const currentProduct = await Product.findById(productId).populate('relatedProducts', 'name price category stock currency isActive merchantId');
     if (!currentProduct) {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
     const related = (currentProduct.relatedProducts as any[]).filter(
-      (p) => p && p.isActive && p.stock > 0
+      (p) => p && p.isActive && p.stock > 0 && (!currentProduct.merchantId || !p.merchantId || p.merchantId.toString() === currentProduct.merchantId.toString())
     );
 
     return related.map((p) => ({

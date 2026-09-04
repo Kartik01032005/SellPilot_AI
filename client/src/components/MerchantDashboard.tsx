@@ -171,13 +171,14 @@ export const MerchantDashboard: React.FC = () => {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this product?')) return;
+    if (!id) return;
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to remove this product?')) return;
     try {
-      const res = await ApiClient.request<{ success: boolean }>(`/api/products/${id}`, {
+      const res = await ApiClient.request<{ success: boolean; message?: string }>(`/api/products/${id}`, {
         method: 'DELETE',
       });
       if (res.success) {
-        setProducts((prev) => prev.filter((product) => String(product._id) !== String(id)));
+        setProducts((prev) => prev.filter((product) => (getId(product._id) || product.id || String(product._id)) !== id));
         fetchProducts();
         fetchInsights();
       } else {
@@ -534,7 +535,10 @@ export const MerchantDashboard: React.FC = () => {
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteProduct(p._id)}
+                          onClick={() => {
+                            const productId = getId(p._id) || (typeof p.id === 'string' ? p.id : (typeof p._id === 'string' ? p._id : ''));
+                            if (productId) handleDeleteProduct(productId);
+                          }}
                           className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
                           title="Delete product"
                         >

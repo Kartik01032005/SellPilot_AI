@@ -48,10 +48,22 @@ export interface ExtractedRequirements {
   comparisonRequested?: boolean;
   targetOrdinal?: number; // 1 for first, 2 for second, 3 for third, etc.
   targetProductName?: string;
+  discountPercentage?: number;
+  subIntent?:
+    | 'BEST_OPPORTUNITY'
+    | 'DISCOUNT_EVALUATION'
+    | 'CATEGORY_PROMOTION'
+    | 'FOLLOW_UP_REASON'
+    | 'FOLLOW_UP_DISCOUNT'
+    | 'ALTERNATIVE_PRODUCT_QUERY'
+    | 'GENERAL_PROMOTION';
+  isFollowUp?: boolean;
+  isAlternativeReferenced?: boolean;
 }
 
 export interface IntentResult {
   intent: BuyerIntent | MerchantIntent;
+  subIntent?: string;
   mode: 'buyer' | 'merchant';
   confidence: number;
   requirements: ExtractedRequirements;
@@ -183,6 +195,29 @@ export class IntentService {
       requirements.comparisonRequested = true;
     }
 
+    // Discount percentage extraction (e.g. "20%", "80% discount", "what about 15%?")
+    const discountMatch = text.match(/(\d{1,3})%\s*(?:discount|off)?/i) || text.match(/(?:discount|off)\s*(?:of)?\s*(\d{1,3})%/i);
+    if (discountMatch && discountMatch[1]) {
+      const parsedPct = parseInt(discountMatch[1], 10);
+      if (parsedPct >= 0 && parsedPct <= 100) {
+        requirements.discountPercentage = parsedPct;
+      }
+    }
+
+    // Follow-up detection (e.g. "what about 15%?", "why this product?", "why?", "can I do that?")
+    if (/\b(what about|how about|why|why this|why that|can i do that|what about the other|and for)\b/i.test(text)) {
+      requirements.isFollowUp = true;
+    }
+
+    // Referential alternative extraction (e.g. "the other shoe", "the other product", "the second one", "the alternative", "another product")
+    if (
+      /\b(?:the\s+)?(?:other|another|second|alternative|different)\s+(?:one|shoe|shoes|product|item|option)?\b/i.test(text) ||
+      /\bwhat about (?:the\s+)?(?:other|second|alternative)\b/i.test(text)
+    ) {
+      requirements.isAlternativeReferenced = true;
+      requirements.isFollowUp = true;
+    }
+
     return requirements;
   }
 
@@ -305,8 +340,11 @@ export class IntentService {
       return 'CAMPAIGN_RECOMMENDATION';
     }
 
-    // Discount Recommendation
-    if (/\b(discount|give discount|offer discount|how much discount|recommend discount|cut price)\b/i.test(text)) {
+    // Discount Recommendation / Evaluation
+    if (
+      /(\d+)%/i.test(text) ||
+      /\b(discount|give discount|offer discount|how much discount|recommend discount|cut price)\b/i.test(text)
+    ) {
       return 'DISCOUNT_RECOMMENDATION';
     }
 
@@ -346,8 +384,26 @@ export class IntentService {
     const requirements = this.extractRequirements(message);
     const intent = mode === 'merchant' ? this.detectMerchantIntent(message) : this.detectBuyerIntent(message);
 
+    if (mode === 'merchant') {
+      const text = message.toLowerCase().trim();
+      if (/\b(best opportunity|strongest opportunity|top opportunity|highest opportunity)\b/i.test(text)) {
+        requirements.subIntent = 'BEST_OPPORTUNITY';
+      } else if (requirements.discountPercentage !== undefined) {
+        requirements.subIntent = 'DISCOUNT_EVALUATION';
+      } else if (requirements.isAlternativeReferenced) {
+        requirements.subIntent = 'ALTERNATIVE_PRODUCT_QUERY';
+      } else if (requirements.category && /\b(promote|promotion|what to sell|what should i promote|which .* should i promote)\b/i.test(text)) {
+        requirements.subIntent = 'CATEGORY_PROMOTION';
+      } else if (/\b(why|why this|why that|explain why)\b/i.test(text)) {
+        requirements.subIntent = 'FOLLOW_UP_REASON';
+      } else if (intent === 'PRODUCT_PROMOTION') {
+        requirements.subIntent = 'GENERAL_PROMOTION';
+      }
+    }
+
     return {
       intent,
+      subIntent: requirements.subIntent,
       mode,
       confidence: intent !== 'UNKNOWN' ? 0.95 : 0.2,
       requirements,

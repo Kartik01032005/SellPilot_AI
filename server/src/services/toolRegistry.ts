@@ -844,16 +844,62 @@ const getMerchantInsightsTool: AgentTool<GetMerchantInsightsArgs, { insights: an
       return {
         insights: {
           promotionOpportunities: [
-            { name: 'Ultra Grip Running Shoes', suggestedDiscount: 15, reason: 'High inventory item with strong velocity potential' },
+            {
+              productId: 'mock_prod_1',
+              name: 'Pro Carbon Running Shoes',
+              category: 'Shoes',
+              price: 2999,
+              stock: 25,
+              suggestedDiscount: 15,
+              reason: 'High stock in Shoes with healthy margin. Recommended safe promotion up to 15%.',
+            },
+          ],
+          bestOpportunities: [
+            {
+              productId: 'mock_prod_1',
+              name: 'Pro Carbon Running Shoes',
+              category: 'Shoes',
+              price: 2999,
+              stock: 25,
+              score: 95,
+              reason: 'Strongest commercial opportunity in Shoes: ₹2,999 with 25 units in stock and ₹74,975 revenue potential.',
+            },
           ],
           crossSellOpportunities: [
-            { primaryName: 'Running Shoes', relatedName: 'Sports Socks' },
+            {
+              name: 'Pro Carbon Running Shoes',
+              relatedName: 'Anti-Blister Running Socks',
+              category: 'Shoes',
+              relatedCategory: 'Accessories',
+            },
           ],
           upsellOpportunities: [
-            { name: 'Standard Shoes', premiumName: 'Carbon Shoes', priceDiff: 500 },
+            {
+              productId: 'mock_prod_2',
+              name: 'Ultra Grip Road Running Shoes',
+              premiumProductId: 'mock_prod_1',
+              premiumName: 'Pro Carbon Running Shoes',
+              category: 'Shoes',
+              priceDiff: 500,
+            },
           ],
           topProducts: [
-            { name: 'Pro Carbon Running Shoes', category: 'Shoes', price: 2999, stock: 12 },
+            {
+              id: 'mock_prod_1',
+              productId: 'mock_prod_1',
+              name: 'Pro Carbon Running Shoes',
+              category: 'Shoes',
+              price: 2999,
+              stock: 15,
+            },
+            {
+              id: 'mock_prod_2',
+              productId: 'mock_prod_2',
+              name: 'Ultra Grip Road Running Shoes',
+              category: 'Shoes',
+              price: 2499,
+              stock: 5,
+            },
           ],
         },
       };

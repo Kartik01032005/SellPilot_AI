@@ -5,9 +5,12 @@ import { Merchant } from '../models/Merchant';
 import { CustomError } from '../middleware/errorHandler';
 
 export interface MerchantInsightsResult {
+  merchantName?: string;
+  maxDiscountPercentage?: number;
   topProducts: Array<{ id: string; name: string; category: string; price: number; stock: number; salesCount?: number }>;
   lowPerformingProducts: Array<{ id: string; name: string; category: string; price: number; stock: number; reason: string }>;
-  promotionOpportunities: Array<{ productId: string; name: string; suggestedDiscount: number; reason: string }>;
+  promotionOpportunities: Array<{ productId: string; name: string; category?: string; price?: number; stock?: number; suggestedDiscount: number; reason: string }>;
+  bestOpportunities: Array<{ productId: string; name: string; category: string; price: number; stock: number; score: number; reason: string }>;
   crossSellOpportunities: Array<{ productId: string; name: string; relatedProductId: string; relatedName: string; reason: string }>;
   upsellOpportunities: Array<{ productId: string; name: string; premiumProductId: string; premiumName: string; priceDiff: number; reason: string }>;
 }
@@ -20,18 +23,24 @@ export class MerchantService {
 
     if (mongoose.connection.readyState === 0) {
       return {
+        merchantName: 'Demo Store',
+        maxDiscountPercentage: 25,
         topProducts: [
-          { id: 'mock_1', name: 'Pro Carbon Running Shoes', category: 'Shoes', price: 2999, stock: 12, salesCount: 45 },
+          { id: 'mock_1', name: 'Pro Carbon Running Shoes', category: 'Shoes', price: 2999, stock: 15, salesCount: 45 },
+          { id: 'mock_2', name: 'Ultra Grip Road Running Shoes', category: 'Shoes', price: 2499, stock: 5, salesCount: 20 },
         ],
         lowPerformingProducts: [],
         promotionOpportunities: [
-          { productId: 'mock_1', name: 'Ultra Grip Road Shoes', suggestedDiscount: 15, reason: 'High inventory item with strong velocity potential' },
+          { productId: 'mock_2', name: 'Ultra Grip Road Running Shoes', category: 'Shoes', price: 2499, stock: 5, suggestedDiscount: 15, reason: 'High inventory item with strong velocity potential' },
+        ],
+        bestOpportunities: [
+          { productId: 'mock_1', name: 'Pro Carbon Running Shoes', category: 'Shoes', price: 2999, stock: 15, score: 95, reason: 'Highest commercial opportunity in Shoes' },
         ],
         crossSellOpportunities: [
-          { productId: 'mock_1', name: 'Running Shoes', relatedProductId: 'mock_2', relatedName: 'Sports Socks', reason: 'Complementary pair' },
+          { productId: 'mock_1', name: 'Pro Carbon Running Shoes', relatedProductId: 'mock_3', relatedName: 'Performance Compression Sports Socks (3-Pack)', reason: 'Complementary pair' },
         ],
         upsellOpportunities: [
-          { productId: 'mock_1', name: 'Ultra Grip Road Shoes', premiumProductId: 'mock_2', premiumName: 'Pro Carbon Running Shoes', priceDiff: 500, reason: 'Premium alternative' },
+          { productId: 'mock_2', name: 'Ultra Grip Road Running Shoes', premiumProductId: 'mock_1', premiumName: 'Pro Carbon Running Shoes', priceDiff: 500, reason: 'Premium alternative' },
         ],
       };
     }
@@ -45,7 +54,7 @@ export class MerchantService {
       merchantId: new mongoose.Types.ObjectId(merchantId),
       isActive: true,
     })
-      .populate('relatedProducts', 'name price category stock currency isActive')
+      .populate('relatedProducts', 'name price category stock currency isActive merchantId')
       .exec();
 
     // Query actual order items to calculate sales metrics if orders exist
@@ -96,16 +105,40 @@ export class MerchantService {
       .map((p) => ({
         productId: p._id.toString(),
         name: p.name,
+        category: p.category,
+        price: p.price,
+        stock: p.stock,
         suggestedDiscount: Math.min(15, maxDiscount),
         reason: `High stock in ${p.category} with healthy margin. Recommended safe promotion up to ${Math.min(15, maxDiscount)}%.`,
       }));
 
-    // 4. Cross-Sell Opportunities (based on verified database relationships)
+    // 4. Best Opportunities (independent multi-factor scoring: velocity, margin/price tier, stock depth)
+    const bestOpportunities = products
+      .filter((p) => p.isActive && p.stock > 0)
+      .map((p) => {
+        const sales = productSalesMap.get(p._id.toString()) || 0;
+        const revenuePotential = p.price * p.stock;
+        const score = Math.round(p.stock * 1.5 + p.price / 100 + sales * 10);
+        return {
+          productId: p._id.toString(),
+          name: p.name,
+          category: p.category,
+          price: p.price,
+          stock: p.stock,
+          score,
+          reason: `Strongest commercial opportunity in ${p.category}: ₹${p.price.toLocaleString('en-IN')} with ${p.stock} units in stock and ₹${revenuePotential.toLocaleString('en-IN')} total revenue potential.`,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    // 5. Cross-Sell Opportunities (based on verified database relationships)
     const crossSellOpportunities: MerchantInsightsResult['crossSellOpportunities'] = [];
     for (const p of products) {
       if (p.relatedProducts && p.relatedProducts.length > 0) {
         for (const rel of p.relatedProducts as any[]) {
-          if (rel && rel.name && rel.stock > 0 && rel.merchantId?.toString() === merchantId) {
+          const relMerchantId = rel?.merchantId ? rel.merchantId.toString() : merchantId;
+          if (rel && rel.name && rel.stock > 0 && relMerchantId === merchantId) {
             crossSellOpportunities.push({
               productId: p._id.toString(),
               name: p.name,
@@ -118,7 +151,26 @@ export class MerchantService {
       }
     }
 
-    // 5. Upsell Opportunities (higher value alternatives in same category)
+    // Fallback cross-sell opportunities from cross-category catalog pairings if explicit links are not configured
+    if (crossSellOpportunities.length === 0 && products.length > 1) {
+      for (let i = 0; i < products.length; i++) {
+        for (let j = 0; j < products.length; j++) {
+          if (i !== j && products[i].category !== products[j].category && products[j].stock > 0) {
+            crossSellOpportunities.push({
+              productId: products[i]._id.toString(),
+              name: products[i].name,
+              relatedProductId: products[j]._id.toString(),
+              relatedName: products[j].name,
+              reason: `Cross-category affinity: Pair ${products[i].name} (${products[i].category}) with ${products[j].name} (${products[j].category}) to boost average order value.`,
+            });
+            break;
+          }
+        }
+        if (crossSellOpportunities.length >= 3) break;
+      }
+    }
+
+    // 6. Upsell Opportunities (higher value alternatives in same category)
     const upsellOpportunities: MerchantInsightsResult['upsellOpportunities'] = [];
     for (let i = 0; i < products.length; i++) {
       for (let j = 0; j < products.length; j++) {
@@ -143,11 +195,62 @@ export class MerchantService {
     }
 
     return {
+      merchantName: merchant.name || merchant.businessName,
+      maxDiscountPercentage: maxDiscount,
       topProducts,
       lowPerformingProducts,
       promotionOpportunities,
+      bestOpportunities,
       crossSellOpportunities: crossSellOpportunities.slice(0, 5),
       upsellOpportunities: upsellOpportunities.slice(0, 5),
+    };
+  }
+
+  public static async evaluateDiscountPolicy(
+    merchantId: string,
+    requestedPercentage: number,
+    category?: string,
+    productId?: string
+  ): Promise<{
+    allowed: boolean;
+    requestedPercentage: number;
+    maxAllowedPercentage: number;
+    merchantId: string;
+    category?: string;
+    productName?: string;
+    reason: string;
+  }> {
+    let maxAllowed = 25;
+    if (mongoose.Types.ObjectId.isValid(merchantId)) {
+      const merchant = await Merchant.findById(merchantId);
+      if (merchant?.maxDiscountPercentage) {
+        maxAllowed = merchant.maxDiscountPercentage;
+      }
+    }
+
+    let productName: string | undefined;
+    if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+      const p = await Product.findById(productId);
+      if (p) {
+        productName = p.name;
+        if (!category) category = p.category;
+      }
+    }
+
+    const allowed = requestedPercentage <= maxAllowed;
+    const scopeStr = productName ? `on "${productName}"` : category ? `on ${category}` : 'storewide';
+    const reason = allowed
+      ? `A ${requestedPercentage}% discount ${scopeStr} is within your safety threshold (maximum permitted is ${maxAllowed}%).`
+      : `An ${requestedPercentage}% discount ${scopeStr} exceeds your configured safety threshold of ${maxAllowed}%. You may offer up to ${maxAllowed}%.`;
+
+    return {
+      allowed,
+      requestedPercentage,
+      maxAllowedPercentage: maxAllowed,
+      merchantId,
+      category,
+      productName,
+      reason,
     };
   }
 }

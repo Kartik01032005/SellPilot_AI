@@ -198,6 +198,14 @@ export class SeedService {
         ? await Merchant.findById(merchantId)
         : null;
 
+      if (merchant) {
+        const productCount = await Product.countDocuments({ merchantId: merchant._id });
+        if (productCount > 0) {
+          const activeCount = await Product.countDocuments({ merchantId: merchant._id, isActive: true });
+          return { seededCount: 0, totalCount: activeCount };
+        }
+      }
+
       if (!merchant) {
         // The CLI restore uses the demo merchant; authenticated callers pass their merchant ID.
         let merchantUser = await User.findOne({ email: 'merchant@sellpilot.ai' });
@@ -298,13 +306,9 @@ export class SeedService {
             isActive: true,
           });
           seededCount++;
-        } else {
-          // If existing is marked inactive or 0 stock, revive for demo
-          if (!existing.isActive || existing.stock <= 0) {
-            existing.isActive = true;
-            existing.stock = Math.max(existing.stock, def.stock);
-            await existing.save();
-          }
+        } else if (existing.stock <= 0 && existing.isActive) {
+          existing.stock = Math.max(existing.stock, def.stock);
+          await existing.save();
         }
 
         skuToDocMap.set(def.sku, existing);

@@ -4,6 +4,7 @@ import { ProductService } from '../services/productService';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
 import { SeedService } from '../services/seedService';
+import { User } from '../models/User';
 
 export class ProductController {
   public static async getProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -98,7 +99,16 @@ export class ProductController {
   public static async deleteProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const merchantId = req.user?.merchantId;
+      let merchantId = req.user?.merchantId;
+      if (!merchantId && req.user?.userId) {
+        const user = await User.findById(req.user.userId).select('merchantId');
+        if (user?.merchantId) {
+          merchantId = user.merchantId.toString();
+        }
+      }
+      if (!merchantId && req.headers['x-merchant-id']) {
+        merchantId = req.headers['x-merchant-id'] as string;
+      }
       if (!merchantId || !mongoose.Types.ObjectId.isValid(merchantId)) {
         throw new CustomError('A valid authenticated merchantId is required', 403, 'MERCHANT_ID_REQUIRED');
       }

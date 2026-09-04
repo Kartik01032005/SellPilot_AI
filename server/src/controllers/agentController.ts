@@ -67,9 +67,14 @@ export class AgentController {
         throw new CustomError('cartItems must contain valid productId and quantity values', 400, 'INVALID_REQUEST');
       }
 
+      const sessionMerchantId =
+        req.user?.merchantId ||
+        (req.headers['x-merchant-id'] as string) ||
+        undefined;
+
       const recommendations = await AgentRevenueRecommendationService.recommend(
         cartItems,
-        req.user?.merchantId
+        sessionMerchantId
       );
 
       // Final response validation ensures no provider/service output can expose
@@ -96,7 +101,7 @@ export class AgentController {
       if (safeRecommendations.length === 0 || safeRecommendations.length !== recommendations.length) {
         await AuditService.logRecommendationRejected({
           userId: req.user?.userId,
-          merchantId: req.user?.merchantId,
+          merchantId: sessionMerchantId,
           reason: 'RECOMMENDATION_UNAVAILABLE',
           cartItemsCount: cartItems.length,
           correlationId: AgentController.getCorrelationId(req),
@@ -107,7 +112,7 @@ export class AgentController {
 
       await AuditService.logRecommendationGenerated({
         userId: req.user?.userId,
-        merchantId: req.user?.merchantId,
+        merchantId: sessionMerchantId,
         recommendationsCount: safeRecommendations.length,
         productIds: safeRecommendations.map((r) => r.productId),
         recommendationTypes: safeRecommendations.map((r) => r.type),
@@ -117,9 +122,14 @@ export class AgentController {
 
       res.status(200).json({ success: true, recommendations: safeRecommendations });
     } catch (error: any) {
+      const sessionMerchantId =
+        req.user?.merchantId ||
+        (req.headers['x-merchant-id'] as string) ||
+        undefined;
+
       await AuditService.logRecommendationRejected({
         userId: req.user?.userId,
-        merchantId: req.user?.merchantId,
+        merchantId: sessionMerchantId,
         reason: error?.message || 'RECOMMENDATION_UNAVAILABLE',
         cartItemsCount: req.body?.cartItems?.length,
         correlationId: AgentController.getCorrelationId(req),

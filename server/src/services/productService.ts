@@ -144,7 +144,7 @@ export class ProductService {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
-    if (!product.merchantId || product.merchantId.toString() !== merchantId) {
+    if (!product.merchantId || product.merchantId.toString() !== merchantId.toString()) {
       throw new CustomError('Not authorized to delete this product', 403, 'FORBIDDEN');
     }
 
@@ -153,7 +153,7 @@ export class ProductService {
     }
 
     const deleted = await Product.findOneAndUpdate(
-      { _id: id, merchantId, isActive: true },
+      { _id: new mongoose.Types.ObjectId(id), merchantId: new mongoose.Types.ObjectId(merchantId), isActive: true },
       { $set: { isActive: false } },
       { new: true }
     ).exec();

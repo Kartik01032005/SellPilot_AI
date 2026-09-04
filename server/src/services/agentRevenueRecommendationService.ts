@@ -160,9 +160,10 @@ export function resolveAiProvider(): AiProviderType {
   return 'none';
 }
 
-export async function callNvidiaNimApi(
-  cartProducts: CatalogProduct[],
-  candidates: CatalogProduct[]
+export async function callNvidiaChatCompletion(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  maxTokens = 500,
+  temperature = 0.2
 ): Promise<string> {
   const apiKey = (config.ai.apiKey !== undefined ? config.ai.apiKey : process.env.AI_API_KEY || process.env.NVIDIA_API_KEY || '').trim();
   const rawServiceUrl = (config.ai.serviceUrl !== undefined ? config.ai.serviceUrl : process.env.AI_SERVICE_URL || 'https://integrate.api.nvidia.com/v1').trim();
@@ -175,8 +176,6 @@ export async function callNvidiaNimApi(
   const endpoint = rawServiceUrl.endsWith('/chat/completions')
     ? rawServiceUrl
     : `${rawServiceUrl.replace(/\/+$/, '')}/chat/completions`;
-
-  const messages = buildPromptMessages(cartProducts, candidates);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -191,8 +190,8 @@ export async function callNvidiaNimApi(
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0.1,
-        max_tokens: 500,
+        temperature,
+        max_tokens: maxTokens,
       }),
       signal: controller.signal,
     });
@@ -207,6 +206,14 @@ export async function callNvidiaNimApi(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function callNvidiaNimApi(
+  cartProducts: CatalogProduct[],
+  candidates: CatalogProduct[]
+): Promise<string> {
+  const messages = buildPromptMessages(cartProducts, candidates);
+  return await callNvidiaChatCompletion(messages as any, 500, 0.1);
 }
 
 export async function callGeminiApi(prompt: string): Promise<string> {
@@ -322,7 +329,10 @@ export class AgentRevenueRecommendationService {
 
     // Candidates must be available (in stock + active) and not already in the cart
     const availableCandidates = scopedCatalog.filter(
-      (product) => product.available && !cartIds.has(product.productId)
+      (product) =>
+        product.available &&
+        !cartIds.has(product.productId) &&
+        (!merchantId || product.merchantId === merchantId)
     );
 
     if (availableCandidates.length === 0) {
@@ -375,6 +385,14 @@ export class AgentRevenueRecommendationService {
       const candidate = candidateById.get(item.productId);
       if (!candidate) {
         // Hallucinated or non-candidate product ID: REJECT
+        continue;
+      }
+
+      // Must strictly belong to the active authenticated merchant store
+      if (merchantId && candidate.merchantId && candidate.merchantId !== merchantId) {
+        continue;
+      }
+      if (authenticatedMerchantId && candidate.merchantId && candidate.merchantId !== authenticatedMerchantId) {
         continue;
       }
 

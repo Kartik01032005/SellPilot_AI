@@ -5,6 +5,8 @@ import agentRouter from '../src/routes/agent';
 import { errorHandler } from '../src/middleware/errorHandler';
 import { config } from '../src/config/env';
 import { ProductService } from '../src/services/productService';
+import { Product } from '../src/models/Product';
+import { ConversationCartService } from '../src/services/conversationCartService';
 import {
   AgentRevenueRecommendationService,
   setAiProvider,
@@ -423,6 +425,188 @@ describe('Step 2 — Safe AI Revenue Agent (UPSELL & CROSS_SELL)', () => {
           explanation: expect.any(String),
         })
       );
+    });
+  });
+
+  describe('Merchant Scoping & Cross-Merchant Isolation', () => {
+    const foreignMerchantId = '507f1f77bcf86cd799439099';
+    const foreignProductId = '507f1f77bcf86cd799439088';
+
+    const multiMerchantCatalog = [
+      ...sampleCatalog,
+      {
+        id: foreignProductId,
+        productId: foreignProductId,
+        name: 'Foreign Merchant Running Shoes',
+        description: 'Shoes from another merchant store',
+        category: 'Shoes',
+        price: 3600,
+        currency: 'INR',
+        available: true,
+        availability: 'IN_STOCK',
+        inventory: 20,
+        inventoryStatus: 'IN_STOCK',
+        features: ['Foreign brand'],
+        tags: ['shoes'],
+        merchantId: foreignMerchantId,
+        active: true,
+        isActive: true,
+        relatedProducts: [],
+      },
+    ];
+
+    it('passes authenticated merchantId to ProductService.getAICatalog and only supplies merchant candidates to AI', async () => {
+      let receivedCandidates: any[] = [];
+      setAiProvider(async (cart, candidates) => {
+        receivedCandidates = candidates;
+        return [
+          {
+            type: 'UPSELL',
+            productId: '507f1f77bcf86cd799439014',
+            reason: 'Legitimate merchant upgrade',
+          },
+        ];
+      });
+
+      const response = await request(app)
+        .post('/api/agent/recommendations')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          cartItems: [{ productId: '507f1f77bcf86cd799439011', quantity: 1 }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(getAICatalogSpy).toHaveBeenCalledWith(merchantId);
+      expect(receivedCandidates.length).toBeGreaterThan(0);
+      for (const candidate of receivedCandidates) {
+        expect(candidate.merchantId).toBe(merchantId);
+      }
+    });
+
+    it('extracts merchantId from x-merchant-id header when not in token and scopes catalog', async () => {
+      const tokenWithoutMerchant = jwt.sign(
+        {
+          userId: '507f1f77bcf86cd799439013',
+          email: 'anonymous-buyer@buyer.com',
+          role: 'customer',
+        },
+        config.jwt.secret,
+        { expiresIn: '1h' }
+      );
+
+      setAiProvider(async () => [
+        {
+          type: 'UPSELL',
+          productId: '507f1f77bcf86cd799439014',
+          reason: 'Upgrade matching active merchant',
+        },
+      ]);
+
+      const response = await request(app)
+        .post('/api/agent/recommendations')
+        .set('Authorization', `Bearer ${tokenWithoutMerchant}`)
+        .set('x-merchant-id', merchantId)
+        .send({
+          cartItems: [{ productId: '507f1f77bcf86cd799439011', quantity: 1 }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(getAICatalogSpy).toHaveBeenCalledWith(merchantId);
+    });
+
+    it('strictly filters out recommendations if AI returns a product from another merchant', async () => {
+      getAICatalogSpy.mockResolvedValue(multiMerchantCatalog as any);
+
+      setAiProvider(async () => [
+        {
+          type: 'UPSELL',
+          productId: foreignProductId,
+          reason: 'Try competitor product',
+        },
+      ]);
+
+      const response = await request(app)
+        .post('/api/agent/recommendations')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          cartItems: [{ productId: '507f1f77bcf86cd799439011', quantity: 1 }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(false);
+      expect(response.body.recommendations).toHaveLength(0);
+    });
+
+    it('executes full flow: active merchant recommendation -> displayed product -> Add Upgrade succeeds (200)', async () => {
+      ConversationCartService.clearCart('507f1f77bcf86cd799439013');
+
+      setAiProvider(async () => [
+        {
+          type: 'UPSELL',
+          productId: '507f1f77bcf86cd799439014',
+          reason: 'Elite carbon running shoe',
+        },
+      ]);
+
+      const recResponse = await request(app)
+        .post('/api/agent/recommendations')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          cartItems: [{ productId: '507f1f77bcf86cd799439011', quantity: 1 }],
+        });
+
+      expect(recResponse.status).toBe(200);
+      expect(recResponse.body.success).toBe(true);
+      expect(recResponse.body.recommendations).toHaveLength(1);
+
+      const recommendedProduct = recResponse.body.recommendations[0];
+      expect(recommendedProduct.productId).toBe('507f1f77bcf86cd799439014');
+
+      jest.spyOn(Product, 'findById').mockImplementation((id: any) => {
+        const idStr = id ? id.toString() : '';
+        const found = multiMerchantCatalog.find((p) => p.productId === idStr);
+        return Promise.resolve(found ? { ...found, _id: found.id } : null) as any;
+      });
+
+      const addRes = await request(app)
+        .post('/api/agent/actions/add-to-cart')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          productId: recommendedProduct.productId,
+          quantity: 1,
+          userApproved: true,
+        });
+
+      expect(addRes.status).toBe(200);
+      expect(addRes.body.success).toBe(true);
+      expect(addRes.body.action).toBe('ADD_TO_CART');
+      expect(addRes.body.item.productId).toBe('507f1f77bcf86cd799439014');
+      expect(addRes.body.cart.subtotal).toBe(3500);
+      expect(addRes.body.cart.totalItems).toBe(1);
+    });
+
+    it('strictly rejects Add Upgrade if productId belongs to a different merchant (403 MERCHANT_MISMATCH)', async () => {
+      jest.spyOn(Product, 'findById').mockImplementation((id: any) => {
+        const idStr = id ? id.toString() : '';
+        const found = multiMerchantCatalog.find((p) => p.productId === idStr);
+        return Promise.resolve(found ? { ...found, _id: found.id } : null) as any;
+      });
+
+      const addRes = await request(app)
+        .post('/api/agent/actions/add-to-cart')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          productId: foreignProductId,
+          quantity: 1,
+          userApproved: true,
+        });
+
+      expect(addRes.status).toBe(403);
+      expect(addRes.body.success).toBe(false);
+      expect(addRes.body.error.code).toBe('MERCHANT_MISMATCH');
+      expect(addRes.body.error.message).toContain('Product does not belong to the active merchant store');
     });
   });
 });
