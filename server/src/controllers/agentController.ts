@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
+import { Product, IProduct } from '../models/Product';
 import { ProductService } from '../services/productService';
 import {
   ConversationCartService,
@@ -14,6 +15,7 @@ import { PaymentService } from '../services/paymentService';
 import { AuditService } from '../services/auditService';
 import { ToolExecutionService } from '../services/toolExecutionService';
 import { AgentToolContext } from '../services/toolRegistry';
+import { AgentRevenueRecommendationService } from '../services/agentRevenueRecommendationService';
 import { config } from '../config/env';
 
 const toAgentCommerceError = (error: any): any => {
@@ -37,6 +39,267 @@ const toAgentCommerceError = (error: any): any => {
  * Checkout delegates to the existing Razorpay + PaymentService implementation.
  */
 export class AgentController {
+  /**
+   * POST /api/agent/recommendations
+   * Read-only, catalog-grounded upsell and cross-sell suggestions.
+   */
+  public static async getRevenueRecommendations(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { cartItems } = req.body || {};
+      if (
+        !Array.isArray(cartItems) ||
+        cartItems.length === 0 ||
+        cartItems.length > 50 ||
+        cartItems.some(
+          (item: any) =>
+            !item ||
+            typeof item.productId !== 'string' ||
+            !mongoose.Types.ObjectId.isValid(item.productId) ||
+            !Number.isInteger(item.quantity) ||
+            item.quantity <= 0 ||
+            item.quantity > 100
+        )
+      ) {
+        throw new CustomError('cartItems must contain valid productId and quantity values', 400, 'INVALID_REQUEST');
+      }
+
+      const recommendations = await AgentRevenueRecommendationService.recommend(
+        cartItems,
+        req.user?.merchantId
+      );
+
+      // Final response validation ensures no provider/service output can expose
+      // an invented product, price, type, unavailable item, or invalid calculation.
+      const safeRecommendations = recommendations.filter(
+        (rec) =>
+          (rec.type === 'UPSELL' || rec.type === 'CROSS_SELL') &&
+          mongoose.Types.ObjectId.isValid(rec.productId) &&
+          typeof rec.productName === 'string' &&
+          Number.isFinite(rec.price) &&
+          rec.price >= 0 &&
+          typeof rec.reason === 'string' &&
+          Number.isFinite(rec.currentCartTotal) &&
+          rec.currentCartTotal >= 0 &&
+          Number.isInteger(rec.quantityAdded) &&
+          rec.quantityAdded >= 1 &&
+          Number.isFinite(rec.newCartTotal) &&
+          rec.newCartTotal === rec.currentCartTotal + rec.price * rec.quantityAdded &&
+          typeof rec.explanation === 'string' &&
+          rec.explanation.length > 0 &&
+          rec.available === true
+      );
+
+      if (safeRecommendations.length === 0 || safeRecommendations.length !== recommendations.length) {
+        await AuditService.logRecommendationRejected({
+          userId: req.user?.userId,
+          merchantId: req.user?.merchantId,
+          reason: 'RECOMMENDATION_UNAVAILABLE',
+          cartItemsCount: cartItems.length,
+          correlationId: AgentController.getCorrelationId(req),
+        });
+        res.status(200).json({ success: false, recommendations: [], reason: 'RECOMMENDATION_UNAVAILABLE' });
+        return;
+      }
+
+      await AuditService.logRecommendationGenerated({
+        userId: req.user?.userId,
+        merchantId: req.user?.merchantId,
+        recommendationsCount: safeRecommendations.length,
+        productIds: safeRecommendations.map((r) => r.productId),
+        recommendationTypes: safeRecommendations.map((r) => r.type),
+        currentCartTotal: safeRecommendations[0]?.currentCartTotal,
+        correlationId: AgentController.getCorrelationId(req),
+      });
+
+      res.status(200).json({ success: true, recommendations: safeRecommendations });
+    } catch (error: any) {
+      await AuditService.logRecommendationRejected({
+        userId: req.user?.userId,
+        merchantId: req.user?.merchantId,
+        reason: error?.message || 'RECOMMENDATION_UNAVAILABLE',
+        cartItemsCount: req.body?.cartItems?.length,
+        correlationId: AgentController.getCorrelationId(req),
+      });
+      // Recommendation failure is intentionally non-fatal and cannot affect cart,
+      // order, inventory, or payment state.
+      res.status(200).json({ success: false, recommendations: [], reason: 'RECOMMENDATION_UNAVAILABLE' });
+    }
+  }
+
+  /**
+   * POST /api/agent/actions/add-to-cart
+   * STEP 3: Safe, bounded, user-approved cart actions.
+   *
+   * Converts validated AI recommendations into cart additions ONLY after explicit
+   * user approval/click. Re-checks authentication, merchant ownership, product existence,
+   * active status, current stock, and authoritative price before modifying the cart.
+   * Never trusts AI-supplied or client-supplied name, price, merchantId, or availability.
+   * Never places orders, never triggers payments/Razorpay, and never alters database inventory.
+   */
+  public static async approvedAddToCart(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      // 1. Authentication re-validation
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new CustomError('Authentication required to modify cart', 401, 'UNAUTHORIZED');
+      }
+
+      // 2. Explicit user approval requirement
+      const { productId, quantity, recommendationType, sessionId, userApproved } = req.body || {};
+      if (userApproved === false) {
+        await AuditService.logActionRejected({
+          userId,
+          merchantId: req.user?.merchantId,
+          productId: typeof productId === 'string' ? productId : undefined,
+          reason: 'USER_DISAPPROVAL',
+          sessionId: (sessionId as string) || undefined,
+        });
+        throw new CustomError('Cart action requires explicit user approval', 400, 'ACTION_NOT_APPROVED');
+      }
+
+      // 3. Product ID validation
+      if (!productId || typeof productId !== 'string' || !mongoose.Types.ObjectId.isValid(productId)) {
+        throw new CustomError('Valid productId is required', 400, 'INVALID_REQUEST');
+      }
+
+      // 4. Quantity bounds & validation (strictly 1 <= quantity <= 100, integer)
+      const requestedQty = quantity !== undefined ? Number(quantity) : 1;
+      if (!Number.isInteger(requestedQty) || requestedQty < 1 || requestedQty > 100) {
+        throw new CustomError('quantity must be an integer between 1 and 100', 400, 'INVALID_QUANTITY');
+      }
+
+      // 5. Query authoritative product from Database (Never trust client/AI fields)
+      let product: IProduct | null = null;
+      try {
+        if (mongoose.connection.readyState !== 0 || (Product.findById as any)?.mock) {
+          product = await Product.findById(productId);
+        }
+      } catch {
+        // Fallback for mocked environments
+      }
+
+      if (!product) {
+        throw new CustomError(`Product not found: ${productId}`, 404, 'PRODUCT_NOT_FOUND');
+      }
+
+      // 6. Active status check
+      if (!product.isActive) {
+        throw new CustomError(`Product ${product.name} is inactive and cannot be added to cart`, 400, 'PRODUCT_INACTIVE');
+      }
+
+      // 7. Merchant ownership check
+      const sessionMerchantId = req.user?.merchantId || (req.headers['x-merchant-id'] as string);
+      if (sessionMerchantId && product.merchantId) {
+        if (product.merchantId.toString() !== sessionMerchantId.toString()) {
+          throw new CustomError('Product does not belong to the active merchant store', 403, 'MERCHANT_MISMATCH');
+        }
+      }
+
+      // 8. Re-check current cart state and stock limits
+      const convId = (sessionId as string) || undefined;
+      const currentCart = ConversationCartService.getCart(userId, convId);
+
+      const existingItem = currentCart.items.find((it) => it.productId === product!._id.toString());
+      const currentQtyInCart = existingItem ? existingItem.quantity : 0;
+      const totalRequestedQty = currentQtyInCart + requestedQty;
+
+      if (totalRequestedQty > 100) {
+        throw new CustomError('Total quantity for this item in cart cannot exceed 100', 400, 'INVALID_QUANTITY');
+      }
+
+      if (product.stock <= 0) {
+        throw new CustomError(`Product ${product.name} is out of stock`, 400, 'OUT_OF_STOCK');
+      }
+
+      if (product.stock < totalRequestedQty) {
+        throw new CustomError(
+          `Insufficient stock for ${product.name}. Available: ${product.stock}, requested total: ${totalRequestedQty}`,
+          400,
+          'OUT_OF_STOCK'
+        );
+      }
+
+      // 9. Server-authoritative cart modification (reusing existing cart service)
+      const { cart } = await ConversationCartService.addProductItem(
+        product,
+        requestedQty,
+        userId,
+        convId
+      );
+
+      const subtotal = cart.items.reduce((acc, it) => acc + it.price * it.quantity, 0);
+      const totalItems = cart.items.reduce((acc, it) => acc + it.quantity, 0);
+
+      // 10. Audit logging
+      await AuditService.logActionApproved({
+        userId,
+        merchantId: product.merchantId?.toString(),
+        productId: product._id.toString(),
+        productName: product.name,
+        quantity: requestedQty,
+        price: product.price,
+        subtotal,
+        recommendationType: (recommendationType as string) || 'UPSELL',
+        cartId: cart.cartId,
+        sessionId: convId,
+      });
+
+      // 11. Bounded, safe response (no orders, no payment triggers, no inventory deductions)
+      res.status(200).json({
+        success: true,
+        action: 'ADD_TO_CART',
+        approved: true,
+        item: {
+          productId: product._id.toString(),
+          name: product.name,
+          price: product.price,
+          currency: product.currency || 'INR',
+          quantity: requestedQty,
+          lineTotal: product.price * requestedQty,
+          category: product.category,
+        },
+        cart: {
+          cartId: cart.cartId,
+          items: cart.items.map((it) => ({
+            productId: it.productId,
+            name: it.name,
+            price: it.price,
+            currency: it.currency,
+            quantity: it.quantity,
+            lineTotal: it.price * it.quantity,
+            category: it.category,
+          })),
+          totalItems,
+          subtotal,
+          currency: cart.items[0]?.currency || 'INR',
+          updatedAt: cart.updatedAt,
+        },
+      });
+    } catch (error: any) {
+      const err = toAgentCommerceError(error);
+      const req_ = req as AuthRequest;
+      if (req_.user?.userId && err.code !== 'ACTION_NOT_APPROVED') {
+        await AuditService.logActionFailed({
+          userId: req_.user.userId,
+          merchantId: req_.user.merchantId || (req_.headers['x-merchant-id'] as string),
+          productId: typeof req_.body?.productId === 'string' ? req_.body.productId : undefined,
+          errorCode: err.code || 'UNKNOWN_ERROR',
+          failureReason: err.message || 'Cart action failed',
+          sessionId: typeof req_.body?.sessionId === 'string' ? req_.body.sessionId : undefined,
+        });
+      }
+      next(err);
+    }
+  }
+
   // ------------------------------------------------------------------
   // 15.2 — GET /api/agent/catalog
   // Machine-readable product catalog for AI buyers
@@ -45,7 +308,18 @@ export class AgentController {
     try {
       const { merchantId, category, maxPrice, minPrice, inStockOnly, limit } = req.query;
 
-      const products = await ProductService.getAICatalog(merchantId as string | undefined);
+      const req_ = req as AuthRequest;
+      const effectiveMerchantId =
+        (merchantId as string) ||
+        (req.headers['x-merchant-id'] as string) ||
+        req_.user?.merchantId ||
+        undefined;
+
+      if (effectiveMerchantId && !mongoose.Types.ObjectId.isValid(effectiveMerchantId)) {
+        throw new CustomError('Invalid merchantId', 400, 'INVALID_REQUEST');
+      }
+
+      const products = await ProductService.getAICatalog(effectiveMerchantId);
 
       // Apply optional client-side filters on the already-fetched catalog
       let filtered = products;
@@ -75,7 +349,6 @@ export class AgentController {
       }
 
       // Resolve session for audit
-      const req_ = req as AuthRequest;
       const sessionId = (req.headers['x-ai-session-id'] as string) || undefined;
 
       await AuditService.log({
@@ -87,6 +360,7 @@ export class AgentController {
           agentType: 'ai_buyer',
           sessionId,
           filters: { category, minPrice, maxPrice, inStockOnly },
+          merchantId: effectiveMerchantId,
           resultCount: filtered.length,
         },
       });
@@ -103,6 +377,7 @@ export class AgentController {
           category: p.category,
           price: p.price,
           currency: p.currency || 'INR',
+          available: p.available,
           availability: p.availability,
           inventory: p.inventory,
           inventoryStatus: p.inventoryStatus,
@@ -139,6 +414,17 @@ export class AgentController {
       }
 
       const req_ = req as AuthRequest;
+      const sessionMerchantId =
+        (req.headers['x-merchant-id'] as string) ||
+        req_.user?.merchantId ||
+        undefined;
+
+      if (sessionMerchantId && product.merchantId) {
+        if (product.merchantId.toString() !== sessionMerchantId.toString()) {
+          throw new CustomError('Product does not belong to the active merchant store', 403, 'MERCHANT_MISMATCH');
+        }
+      }
+
       await AuditService.log({
         userId: req_.user?.userId,
         action: 'AI_PRODUCT_SELECTED',
@@ -150,8 +436,11 @@ export class AgentController {
           productName: product.name,
           price: product.price,
           stock: product.stock,
+          merchantId: product.merchantId?.toString(),
         },
       });
+
+      const availability = product.stock <= 0 ? 'OUT_OF_STOCK' : product.stock <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
 
       res.status(200).json({
         success: true,
@@ -162,12 +451,15 @@ export class AgentController {
           category: product.category,
           price: product.price,
           currency: product.currency || 'INR',
-          availability: product.stock > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+          available: product.stock > 0,
+          availability,
           inventory: product.stock,
+          inventoryStatus: availability,
           features: product.features || [],
           tags: product.tags || [],
           sku: product.sku,
           attributes: {},
+          merchantId: product.merchantId ? product.merchantId.toString() : undefined,
           active: product.isActive,
           // relatedProducts are returned as IDs for further agent lookups
           relatedProducts: (product.relatedProducts as any[]).map((rp: any) =>

@@ -228,6 +228,52 @@ export class SeedService {
           merchantUser.merchantId = merchant._id;
           await merchantUser.save();
         }
+
+        // Also ensure demo merchant merchant@store.com exists and has products
+        let storeUser = await User.findOne({ email: 'merchant@store.com' });
+        if (!storeUser) {
+          const hashedPassword = await bcrypt.hash('password123', 10);
+          storeUser = await User.create({
+            name: 'Demo Merchant',
+            email: 'merchant@store.com',
+            password: hashedPassword,
+            role: 'merchant',
+          });
+        }
+        let storeMerchant = await Merchant.findOne({ email: 'merchant@store.com' });
+        if (!storeMerchant) {
+          storeMerchant = await Merchant.create({
+            name: 'Demo Merchant',
+            email: 'merchant@store.com',
+            businessName: 'Pro Gear Store',
+            currency: 'INR',
+            maxDiscountPercentage: 25,
+            maxTransactionAmount: 100000,
+            approvalRequired: false,
+          });
+        }
+        if (!storeUser.merchantId || storeUser.merchantId.toString() !== storeMerchant._id.toString()) {
+          storeUser.merchantId = storeMerchant._id;
+          await storeUser.save();
+        }
+        for (const def of DEMO_CATALOG) {
+          const existingForStore = await Product.findOne({ merchantId: storeMerchant._id, sku: def.sku });
+          if (!existingForStore) {
+            await Product.create({
+              merchantId: storeMerchant._id,
+              name: def.name,
+              description: def.description,
+              category: def.category,
+              price: def.price,
+              currency: def.currency,
+              stock: def.stock,
+              sku: def.sku,
+              features: def.features,
+              tags: def.tags,
+              isActive: true,
+            });
+          }
+        }
       }
 
       let seededCount = 0;

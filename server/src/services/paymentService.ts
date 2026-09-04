@@ -160,7 +160,7 @@ export class PaymentService {
       throw new CustomError('Payment transaction not found', 404, 'NOT_FOUND');
     }
 
-    if (payment.razorpayOrderId !== razorpayOrderId) {
+    if (payment.razorpayOrderId && payment.razorpayOrderId !== razorpayOrderId) {
       throw new CustomError('Payment callback does not match the current Razorpay order', 400, 'PAYMENT_ORDER_MISMATCH');
     }
 
@@ -171,6 +171,15 @@ export class PaymentService {
 
     if (userId && order.userId && order.userId.toString() !== userId) {
       throw new CustomError('Not authorized to verify this payment', 403, 'FORBIDDEN');
+    }
+
+    if (payment.status === 'paid' && payment.verificationStatus === 'verified') {
+      return {
+        success: true,
+        verified: true,
+        status: 'paid',
+        orderId: order._id.toString(),
+      };
     }
 
     // Verify HMAC SHA256 signature

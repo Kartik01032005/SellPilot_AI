@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { MerchantService } from '../services/merchantService';
 import { ProductService } from '../services/productService';
+import { SeedService } from '../services/seedService';
 import { AuthRequest } from '../middleware/auth';
 import { CustomError } from '../middleware/errorHandler';
 import { User } from '../models/User';
@@ -8,7 +9,13 @@ import { User } from '../models/User';
 export class MerchantController {
   public static async getInsights(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const merchantId = req.user?.merchantId || req.user?.userId;
+      let merchantId = req.user?.merchantId;
+      if (!merchantId && req.user?.userId) {
+        const user = await User.findById(req.user.userId).select('merchantId');
+        if (user?.merchantId) {
+          merchantId = user.merchantId.toString();
+        }
+      }
       if (!merchantId) {
         throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
       }
@@ -26,13 +33,18 @@ export class MerchantController {
 
   public static async getMerchantProducts(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authenticatedUser = req.user
-        ? await User.findById(req.user.userId).select('merchantId role').lean()
-        : null;
-      const merchantId = authenticatedUser?.merchantId?.toString() || req.user?.merchantId;
+      let merchantId = req.user?.merchantId;
+      if (!merchantId && req.user?.userId) {
+        const user = await User.findById(req.user.userId).select('merchantId');
+        if (user?.merchantId) {
+          merchantId = user.merchantId.toString();
+        }
+      }
       if (!merchantId) {
         throw new CustomError('Merchant authorization required', 403, 'FORBIDDEN');
       }
+
+      await SeedService.seedCatalogIfEmpty(merchantId);
 
       const products = await ProductService.getProducts({ merchantId });
 

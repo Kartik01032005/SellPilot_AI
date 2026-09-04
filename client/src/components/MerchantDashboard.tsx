@@ -76,20 +76,25 @@ export const MerchantDashboard: React.FC = () => {
   const fetchProducts = async () => {
     setProductsLoading(true);
     try {
-      const res = await ApiClient.request<{ success: boolean; products: any[] }>('/api/products');
-      const apiProducts = Array.isArray(res.products) ? res.products : [];
-      const merchantId = getId(user?.merchantId);
-      const merchantProducts = merchantId
-        ? apiProducts.filter((product) => getId(product.merchantId) === merchantId)
-        : apiProducts;
-
-      if (res.success) {
-        setProducts(merchantProducts);
+      const res = await ApiClient.request<{ success: boolean; products: any[] }>('/api/merchant/products');
+      if (res.success && Array.isArray(res.products)) {
+        setProducts(res.products);
       } else {
-        setProducts([]);
+        const merchantId = getId(user?.merchantId);
+        const fallbackRes = await ApiClient.request<{ success: boolean; products: any[] }>(
+          merchantId ? `/api/products?merchantId=${merchantId}` : '/api/products'
+        );
+        if (fallbackRes.success && Array.isArray(fallbackRes.products)) {
+          const merchantProducts = merchantId
+            ? fallbackRes.products.filter((product) => getId(product.merchantId) === merchantId)
+            : fallbackRes.products;
+          setProducts(merchantProducts);
+        } else {
+          setProducts([]);
+        }
       }
     } catch (error) {
-      // Ignore
+      setProducts([]);
     } finally {
       setProductsLoading(false);
     }

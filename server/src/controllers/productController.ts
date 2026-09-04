@@ -130,7 +130,7 @@ export class ProductController {
     }
   }
 
-  public static async seedProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
+  public static async seedProducts(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await SeedService.seedCatalogIfEmpty(req.user?.merchantId);
 

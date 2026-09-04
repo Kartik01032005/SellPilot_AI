@@ -77,6 +77,60 @@ export class ConversationCartService {
     return product && product.isActive ? product : null;
   }
 
+  public static async addProductItem(
+    product: IProduct,
+    quantity: number = 1,
+    userId?: string,
+    conversationId?: string
+  ): Promise<{ cart: ConversationCartState; addedItem: CartItemRecord }> {
+    if (quantity <= 0) {
+      throw new CustomError('Quantity must be greater than 0', 400, 'INVALID_REQUEST');
+    }
+
+    if (!product || !product.isActive) {
+      throw new CustomError('Product not found or inactive', 404, 'NOT_FOUND');
+    }
+
+    if (product.stock < quantity) {
+      throw new CustomError(
+        `Insufficient inventory for ${product.name}. Available: ${product.stock}, requested: ${quantity}`,
+        400,
+        'OUT_OF_STOCK'
+      );
+    }
+
+    const cart = this.getCart(userId, conversationId);
+    const existingIndex = cart.items.findIndex(
+      (item) => item.productId === product._id.toString()
+    );
+
+    const itemRecord: CartItemRecord = {
+      productId: product._id.toString(),
+      name: product.name,
+      price: product.price,
+      currency: product.currency || 'INR',
+      quantity,
+      category: product.category,
+    };
+
+    if (existingIndex >= 0) {
+      const newQty = cart.items[existingIndex].quantity + quantity;
+      if (product.stock < newQty) {
+        throw new CustomError(
+          `Cannot add more ${product.name}. Max stock is ${product.stock}`,
+          400,
+          'OUT_OF_STOCK'
+        );
+      }
+      cart.items[existingIndex].quantity = newQty;
+    } else {
+      cart.items.push(itemRecord);
+    }
+
+    cart.updatedAt = new Date();
+    return { cart, addedItem: itemRecord };
+  }
+
   public static async addItem(
     productIdentifier: string,
     quantity: number = 1,

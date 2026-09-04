@@ -38,6 +38,12 @@ interface CartContextType {
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   syncCart: (serverItems: Array<{ productId: string; name: string; price: number; quantity?: number; category?: string; image?: string }>) => void;
+  addApprovedRecommendation: (params: {
+    productId: string;
+    quantity?: number;
+    recommendationType?: 'UPSELL' | 'CROSS_SELL';
+    sessionId?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   preparedCheckout: PreparedCheckout | null;
   prepareCheckoutLoading: boolean;
   refreshPreparedCheckout: () => Promise<PreparedCheckout | null>;
@@ -244,6 +250,62 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     []
   );
 
+  const addApprovedRecommendation = useCallback(
+    async (params: {
+      productId: string;
+      quantity?: number;
+      recommendationType?: 'UPSELL' | 'CROSS_SELL';
+      sessionId?: string;
+    }): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await ApiClient.request<{
+          success: boolean;
+          action: string;
+          approved: boolean;
+          item: {
+            productId: string;
+            name: string;
+            price: number;
+            currency: string;
+            quantity: number;
+            category?: string;
+          };
+          error?: { code: string; message: string };
+          message?: string;
+        }>('/api/agent/actions/add-to-cart', {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: params.productId,
+            quantity: params.quantity || 1,
+            recommendationType: params.recommendationType,
+            sessionId: params.sessionId,
+            userApproved: true,
+          }),
+        });
+
+        if (res.success && res.item) {
+          syncCart([
+            {
+              productId: res.item.productId,
+              name: res.item.name,
+              price: res.item.price,
+              quantity: res.item.quantity,
+              category: res.item.category,
+            },
+          ]);
+          setIsCartOpen(true);
+          return { success: true };
+        }
+
+        const errorMessage = res.error?.message || res.message || 'Failed to add approved item to cart';
+        return { success: false, error: errorMessage };
+      } catch (err: any) {
+        return { success: false, error: err.message || 'Network error' };
+      }
+    },
+    [syncCart]
+  );
+
   const itemCount = items.reduce((acc, it) => acc + it.quantity, 0);
 
   return (
@@ -258,6 +320,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateQuantity,
         clearCart,
         syncCart,
+        addApprovedRecommendation,
         preparedCheckout,
         prepareCheckoutLoading,
         refreshPreparedCheckout,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getCartStorageKey } from './cartStorage';
+import { getCartStorageKey } from './cartStorage.ts';
 
 assert.equal(getCartStorageKey('user-a'), 'sellpilot_cart:user-a');
 assert.equal(getCartStorageKey('user-b'), 'sellpilot_cart:user-b');

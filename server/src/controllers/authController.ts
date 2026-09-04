@@ -93,12 +93,28 @@ export class AuthController {
         throw new CustomError('Invalid email or password', 401, 'UNAUTHORIZED');
       }
 
+      if (user.role === 'merchant' && !user.merchantId) {
+        let merchant = await Merchant.findOne({ email: user.email.toLowerCase() });
+        if (!merchant) {
+          merchant = new Merchant({
+            name: user.name,
+            email: user.email.toLowerCase(),
+            businessName: `${user.name}'s Store`,
+          });
+          await merchant.save();
+        }
+        user.merchantId = merchant._id;
+        await user.save();
+      }
+
+      const merchantId = user.merchantId ? user.merchantId.toString() : undefined;
+
       const token = jwt.sign(
         {
           userId: user._id.toString(),
           email: user.email,
           role: user.role,
-          merchantId: user.merchantId ? user.merchantId.toString() : undefined,
+          merchantId,
         },
         config.jwt.secret,
         { expiresIn: '7d' }
@@ -112,7 +128,7 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          merchantId: user.merchantId,
+          merchantId,
         },
       });
     } catch (error) {
@@ -126,19 +142,42 @@ export class AuthController {
         throw new CustomError('Not authenticated', 401, 'UNAUTHORIZED');
       }
 
-      const user = await User.findById(req.user.userId).select('-password').populate('merchantId');
+      let user = await User.findById(req.user.userId).select('-password').populate('merchantId');
       if (!user) {
         throw new CustomError('User not found', 404, 'NOT_FOUND');
       }
 
+      if (user.role === 'merchant' && !user.merchantId) {
+        let merchant = await Merchant.findOne({ email: user.email.toLowerCase() });
+        if (!merchant) {
+          merchant = new Merchant({
+            name: user.name,
+            email: user.email.toLowerCase(),
+            businessName: `${user.name}'s Store`,
+          });
+          await merchant.save();
+        }
+        user.merchantId = merchant._id;
+        await user.save();
+        user = await User.findById(req.user.userId).select('-password').populate('merchantId');
+      }
+
+      const merchantDoc = user?.merchantId as any;
+      const merchantId = merchantDoc?._id
+        ? merchantDoc._id.toString()
+        : user?.merchantId
+        ? user.merchantId.toString()
+        : undefined;
+
       res.status(200).json({
         success: true,
         user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          merchantId: user.merchantId,
+          id: user?._id,
+          name: user?.name,
+          email: user?.email,
+          role: user?.role,
+          merchantId,
+          businessName: merchantDoc?.businessName || merchantDoc?.name,
         },
       });
     } catch (error) {

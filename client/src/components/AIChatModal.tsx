@@ -15,6 +15,7 @@ import {
   TrendingUp,
   CheckCircle2,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -31,6 +32,10 @@ interface ChatMessage {
     category: string;
     available: boolean;
     reason?: string;
+    currentCartTotal?: number;
+    quantityAdded?: number;
+    newCartTotal?: number;
+    explanation?: string;
   }>;
   upsell?: {
     productId: string;
@@ -38,12 +43,20 @@ interface ChatMessage {
     price: number;
     priceDiff: number;
     reason: string;
+    currentCartTotal?: number;
+    quantityAdded?: number;
+    newCartTotal?: number;
+    explanation?: string;
   } | null;
   crossSells?: Array<{
     productId: string;
     name: string;
     price: number;
     reason: string;
+    currentCartTotal?: number;
+    quantityAdded?: number;
+    newCartTotal?: number;
+    explanation?: string;
   }>;
   requiresConfirmation?: boolean;
   timestamp: string;
@@ -65,17 +78,51 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   onCorrelationId,
 }) => {
   const { user } = useAuth();
-  const { addItem, syncCart } = useCart();
+  const { addItem, syncCart, addApprovedRecommendation } = useCart();
   const { language, languageNames } = useLanguage();
 
   const [mode, setMode] = useState<'buyer' | 'merchant'>(initialMode);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [correlationId, setCorrelationId] = useState<string | undefined>(undefined);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const handleAddRecommendation = async (params: {
+    productId: string;
+    name: string;
+    price: number;
+    category?: string;
+    recommendationType?: 'UPSELL' | 'CROSS_SELL';
+  }) => {
+    setActionNotice(null);
+    if (user && addApprovedRecommendation) {
+      const res = await addApprovedRecommendation({
+        productId: params.productId,
+        quantity: 1,
+        recommendationType: params.recommendationType,
+        sessionId: conversationId || undefined,
+      });
+      if (!res.success) {
+        setActionNotice({
+          type: 'error',
+          message: res.error || 'Unable to add this recommendation to your cart.',
+        });
+        setTimeout(() => setActionNotice(null), 5000);
+        return;
+      }
+    } else {
+      addItem({
+        productId: params.productId,
+        name: params.name,
+        price: params.price,
+        category: params.category,
+      });
+    }
+  };
 
   // Initialize initial greeting when opened
   useEffect(() => {
@@ -322,15 +369,29 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                                 {p.reason}
                               </p>
                             )}
+                            {p.currentCartTotal !== undefined && p.newCartTotal !== undefined && (
+                              <div className="mt-2 p-2 rounded-xl bg-slate-100/90 border border-slate-200/80 text-[10px] space-y-0.5">
+                                <div className="flex justify-between text-slate-500 font-medium">
+                                  <span>Cart Impact ({p.quantityAdded || 1} item)</span>
+                                  <span>+₹{p.price.toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-slate-800 text-[11px]">
+                                  <span>₹{p.currentCartTotal.toLocaleString('en-IN')}</span>
+                                  <span className="text-slate-400 font-normal">→</span>
+                                  <span className="text-brand-600">₹{p.newCartTotal.toLocaleString('en-IN')}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <button
                             type="button"
                             onClick={() =>
-                              addItem({
+                              handleAddRecommendation({
                                 productId: p.id,
                                 name: p.name,
                                 price: p.price,
                                 category: p.category,
+                                recommendationType: 'CROSS_SELL',
                               })
                             }
                             className="mt-3 w-full py-1.5 rounded-full bg-white hover:bg-slate-900 text-slate-800 hover:text-white border border-slate-200 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition-all shadow-2xs"
@@ -352,6 +413,19 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                       <span>Value Upsell Suggestion</span>
                     </div>
                     <p className="text-slate-600 text-[11px] font-medium">{msg.upsell.reason}</p>
+                    {msg.upsell.currentCartTotal !== undefined && msg.upsell.newCartTotal !== undefined && (
+                      <div className="mt-2 p-2 rounded-xl bg-white/80 border border-indigo-100 text-[10px] space-y-0.5">
+                        <div className="flex justify-between text-indigo-600 font-medium">
+                          <span>Cart Transition (+{msg.upsell.quantityAdded || 1} item)</span>
+                          <span>+₹{msg.upsell.price.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-slate-800 text-[11px]">
+                          <span>₹{msg.upsell.currentCartTotal.toLocaleString('en-IN')}</span>
+                          <span className="text-slate-400 font-normal">→</span>
+                          <span className="text-indigo-600">₹{msg.upsell.newCartTotal.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-2.5 flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900">
                         {msg.upsell.name} (₹{msg.upsell.price.toLocaleString('en-IN')})
@@ -359,10 +433,11 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                       <button
                         type="button"
                         onClick={() =>
-                          addItem({
+                          handleAddRecommendation({
                             productId: msg.upsell!.productId,
                             name: msg.upsell!.name,
                             price: msg.upsell!.price,
+                            recommendationType: 'UPSELL',
                           })
                         }
                         className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-2xs transition-colors"
@@ -402,6 +477,29 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           )}
           <div ref={chatEndRef} />
         </div>
+
+        {/* Safe Error & Recovery Feedback */}
+        {actionNotice && (
+          <div
+            className={`mx-3 sm:mx-4 mt-2 px-3 py-2 rounded-2xl text-xs flex items-center justify-between animate-fade-in ${
+              actionNotice.type === 'error'
+                ? 'bg-rose-50 text-rose-700 border border-rose-200/80'
+                : 'bg-brand-50 text-brand-700 border border-brand-200/80'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span className="font-medium">{actionNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionNotice(null)}
+              className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-black/5 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Prompt Suggestions */}
         <div className="p-3 bg-slate-50/80 border-t border-slate-100 overflow-x-auto flex gap-1.5 no-scrollbar">
