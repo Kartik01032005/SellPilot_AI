@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { itemCount, setIsCartOpen } = useCart();
-  const { language, setLanguage, languageNames } = useLanguage();
+  const { language, setLanguage, languageNames, t } = useLanguage();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/85 backdrop-blur-md transition-all font-sans">
@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 SellPilot<span className="text-brand-600">.ai</span>
               </span>
               <span className="hidden sm:inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
-                Track 01
+                {t('nav.trackBadge')}
               </span>
             </div>
           </div>
@@ -69,26 +69,30 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Compass className="w-3.5 h-3.5 text-brand-600" />
-              <span>Buyer Discovery</span>
+              <span>{t('nav.buyerDiscovery')}</span>
             </button>
 
-            <button
-              onClick={() => {
-                if (!user) {
-                  openAuthModal();
-                } else {
-                  setActiveTab('merchant');
-                }
-              }}
-              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                activeTab === 'merchant'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5 text-brand-600" />
-              <span>Merchant Hub</span>
-            </button>
+            {(!user || user.role !== 'customer') && (
+              <button
+                onClick={() => {
+                  if (!user) {
+                    openAuthModal();
+                  } else if (user.role === 'customer') {
+                    setActiveTab('discovery');
+                  } else {
+                    setActiveTab('merchant');
+                  }
+                }}
+                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeTab === 'merchant'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5 text-brand-600" />
+                <span>{t('nav.merchantHub')}</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -105,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Package className="w-3.5 h-3.5 text-brand-600" />
-              <span>My Orders</span>
+              <span>{t('nav.myOrders')}</span>
             </button>
           </nav>
         </div>
@@ -120,7 +124,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             />
             <span className="capitalize text-[11px] font-semibold">
-              {serverStatus.loading ? 'Connecting' : serverStatus.status}
+              {serverStatus.loading
+                ? t('common.connecting')
+                : serverStatus.status === 'healthy'
+                ? t('common.healthy')
+                : t('common.offline')}
             </span>
           </div>
 
@@ -135,7 +143,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {Object.entries(languageNames).map(([key, item]) => (
                 <option key={key} value={key}>
-                  {item.label}
+                  {item.native}
                 </option>
               ))}
             </select>
@@ -148,14 +156,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-1.5 px-4 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
           >
             <Sparkles className="w-3.5 h-3.5 text-brand-300 animate-pulse" />
-            <span>Ask SellPilot AI</span>
+            <span>{t('nav.askAI')}</span>
           </button>
 
           {/* Cart Trigger */}
           <button
             onClick={() => setIsCartOpen(true)}
             className="relative p-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 hover:text-slate-900 transition-all"
-            title="Open Cart"
+            title={t('nav.cart')}
           >
             <ShoppingCart className="w-4 h-4" />
             {itemCount > 0 && (
@@ -175,11 +183,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <p className="text-xs font-bold text-slate-800 truncate max-w-[90px]">
                   {user.email.split('@')[0]}
                 </p>
-                <p className="text-[10px] text-slate-500 capitalize font-medium">{user.role}</p>
+                <p className="text-[10px] text-slate-500 capitalize font-medium">
+                  {user.role === 'customer'
+                    ? t('nav.customerRole')
+                    : user.role === 'merchant'
+                    ? t('nav.merchantRole')
+                    : t('nav.adminRole')}
+                </p>
               </div>
               <button
                 onClick={logout}
-                title="Logout"
+                title={t('nav.logout')}
                 className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -191,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center space-x-1.5 px-4 py-1.5 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition-all"
             >
               <User className="w-3.5 h-3.5 text-slate-500" />
-              <span>Login</span>
+              <span>{t('nav.login')}</span>
             </button>
           )}
         </div>

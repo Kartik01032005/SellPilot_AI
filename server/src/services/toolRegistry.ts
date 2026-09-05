@@ -97,19 +97,23 @@ const searchProductsTool: AgentTool<SearchProductsArgs, { count: number; product
     if (mongoose.connection.readyState === 0) {
       const cat = args.category || 'Shoes';
       const maxP = args.maxPrice || 3000;
+      let mockPrice = 2999;
+      if (/laptop/i.test(cat)) mockPrice = 48999;
+      else if (/phone/i.test(cat)) mockPrice = 32999;
+      else if (/camera/i.test(cat)) mockPrice = 64999;
       return {
         count: 1,
         products: [
           {
             id: 'mock_prod_1',
             name: `Pro ${cat}`,
-            price: Math.min(2999, maxP),
+            price: Math.min(mockPrice, maxP),
             currency: 'INR',
             stock: 15,
             category: cat,
             features: args.features || ['High Performance'],
             available: true,
-            reason: `Matches your ${cat} search and fits within your ₹${maxP} budget.`,
+            reason: `Matches your ${cat} search and fits within your ₹${maxP.toLocaleString('en-IN')} budget.`,
           },
         ],
       };
@@ -153,9 +157,14 @@ const searchProductsTool: AgentTool<SearchProductsArgs, { count: number; product
     // Keyword fallback search if exact match gave zero
     if (products.length === 0 && (args.query || (args.keywords && args.keywords.length > 0))) {
       const kwList = [args.query, ...(args.keywords || [])].filter(Boolean) as string[];
+      const fallbackPriceQuery: Record<string, number> = {};
+      if (args.minPrice !== undefined) fallbackPriceQuery.$gte = args.minPrice;
+      if (args.maxPrice !== undefined) fallbackPriceQuery.$lte = args.maxPrice;
+
       products = await Product.find({
         isActive: true,
         ...(args.inStockOnly ? { stock: { $gt: 0 } } : {}),
+        ...(Object.keys(fallbackPriceQuery).length > 0 ? { price: fallbackPriceQuery } : {}),
         $or: kwList.map((kw) => ({
           $or: [
             { name: { $regex: kw, $options: 'i' } },

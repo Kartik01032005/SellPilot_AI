@@ -19,6 +19,10 @@ export class AIController {
         throw new CustomError('Message is required', 400, 'INVALID_REQUEST');
       }
 
+      if (mode === 'merchant' && req.user?.role === 'customer') {
+        throw new CustomError('Access denied: Customer accounts cannot access merchant mode', 403, 'FORBIDDEN');
+      }
+
       const result = await AgentService.processChatMessage({
         message: message.trim(),
         mode,

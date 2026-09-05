@@ -68,6 +68,42 @@ export const DEMO_CATALOG: SeedProductDef[] = [
     relatedSkus: ['ACC-BAG-WATER', 'ELEC-HEAD-ANC'],
   },
   {
+    name: 'Pro Gaming Laptop 15.6"',
+    description: 'High-performance gaming laptop with 144Hz IPS display, RTX graphics, and 1TB NVMe SSD.',
+    category: 'Laptops',
+    price: 74999,
+    currency: 'INR',
+    stock: 8,
+    sku: 'LAP-GAME-15',
+    features: ['16GB RAM', '1TB NVMe SSD', 'RTX Graphics', '144Hz IPS Display'],
+    tags: ['laptop', 'gaming', 'computer', 'pro laptop'],
+    relatedSkus: ['ACC-BAG-WATER', 'ELEC-KEY-RGB'],
+  },
+  {
+    name: 'Creator Studio Laptop 16"',
+    description: 'Ultra-clear 4K OLED display powerhouse laptop for creators and developers.',
+    category: 'Laptops',
+    price: 89999,
+    currency: 'INR',
+    stock: 5,
+    sku: 'LAP-CREAT-16',
+    features: ['32GB RAM', '1TB SSD', '4K OLED Display', 'All-Day Battery'],
+    tags: ['laptop', 'creator', 'studio', 'notebook'],
+    relatedSkus: ['ACC-BAG-WATER', 'ELEC-HEAD-ANC'],
+  },
+  {
+    name: 'Flagship Titan Workstation Laptop 17"',
+    description: 'Extreme performance workstation laptop with liquid cooling chamber and desktop-grade GPU.',
+    category: 'Laptops',
+    price: 139999,
+    currency: 'INR',
+    stock: 3,
+    sku: 'LAP-TITAN-17',
+    features: ['64GB RAM', '2TB SSD', 'RTX 4080', '240Hz QHD Display'],
+    tags: ['laptop', 'flagship', 'workstation'],
+    relatedSkus: ['ACC-BAG-WATER'],
+  },
+  {
     name: 'Executive Waterproof Laptop Bag',
     description: 'Padded shockproof laptop briefcase with organizer compartments.',
     category: 'Accessories',
@@ -198,13 +234,7 @@ export class SeedService {
         ? await Merchant.findById(merchantId)
         : null;
 
-      if (merchant) {
-        const productCount = await Product.countDocuments({ merchantId: merchant._id });
-        if (productCount > 0) {
-          const activeCount = await Product.countDocuments({ merchantId: merchant._id, isActive: true });
-          return { seededCount: 0, totalCount: activeCount };
-        }
-      }
+      // If merchant is provided or discovered, ensure all DEMO_CATALOG items exist
 
       if (!merchant) {
         // The CLI restore uses the demo merchant; authenticated callers pass their merchant ID.

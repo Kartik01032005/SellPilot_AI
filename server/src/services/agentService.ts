@@ -162,6 +162,316 @@ const saveMerchantMemory = (
   }
 };
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  kn: 'Kannada (ಕನ್ನಡ)',
+  hi: 'Hindi (हिन्दी)',
+  ta: 'Tamil (தமிழ்)',
+  te: 'Telugu (తెలుగు)',
+};
+
+const LOCALIZED_BUYER_STRINGS = {
+  checkoutPrompt: {
+    en: 'Your total is ready. Ready to continue to secure Razorpay Test Mode checkout?',
+    kn: 'ನಿಮ್ಮ ಒಟ್ಟು ಮೊತ್ತ ಸಿದ್ಧವಾಗಿದೆ. ಸುರಕ್ಷಿತ Razorpay Test Mode ಚೆಕ್‌ಔಟ್‌ಗೆ ಮುಂದುವರಿಯಲು ಸಿದ್ಧರಿದ್ದೀರಾ?',
+    hi: 'आपका कुल योग तैयार है। क्या आप सुरक्षित Razorpay Test Mode चेकआउट जारी रखने के लिए तैयार हैं?',
+    ta: 'உங்கள் மொத்த தொகை தயாராக உள்ளது. பாதுகாப்பான Razorpay Test Mode கட்டணத்திற்கு செல்ல தயாரா?',
+    te: 'మీ మొత్తం సిద్ధంగా ఉంది. సురక్షితమైన Razorpay Test Mode చెక్అవుట్‌ను కొనసాగించడానికి సిద్ధంగా ఉన్నారా?',
+  },
+  addedToCart: (name: string, price: number, totalItems: number, subtotal: number, lang: string) => {
+    const formattedPrice = price.toLocaleString('en-IN');
+    const formattedSubtotal = subtotal.toLocaleString('en-IN');
+    switch (lang) {
+      case 'kn':
+        return `ನಾನು ${name} (₹${formattedPrice}) ಅನ್ನು ನಿಮ್ಮ ಕಾರ್ಟ್‌ಗೆ ಸೇರಿಸಿದ್ದೇನೆ. ನಿಮ್ಮ ಕಾರ್ಟ್‌ನಲ್ಲಿ ಈಗ ${totalItems} ಐಟಂಗಳು ಇವೆ, ಒಟ್ಟು ಮೊತ್ತ ₹${formattedSubtotal}.`;
+      case 'hi':
+        return `मैंने ${name} (₹${formattedPrice}) को आपके कार्ट में जोड़ दिया है। आपके कार्ट में अब ${totalItems} आइटम हैं, कुल ₹${formattedSubtotal}।`;
+      case 'ta':
+        return `நான் ${name} (₹${formattedPrice}) ஐ உங்கள் கூடையில் சேர்த்துள்ளேன். உங்கள் கூடையில் இப்போது ${totalItems} பொருட்கள் உள்ளன, மொத்தம் ₹${formattedSubtotal}.`;
+      case 'te':
+        return `నేను ${name} (₹${formattedPrice}) ను మీ కార్ట్‌కు జోడించాను. మీ కార్ట్‌లో ఇప్పుడు ${totalItems} అంశాలు ఉన్నాయి, మొత్తం ₹${formattedSubtotal}.`;
+      default:
+        return `I've added ${name} (₹${formattedPrice}) to your cart. Your cart now has ${totalItems} item${totalItems > 1 ? 's' : ''} totaling ₹${formattedSubtotal}.`;
+    }
+  },
+  cartEmpty: {
+    en: 'Your cart is currently empty. Tell me what products you are looking for!',
+    kn: 'ನಿಮ್ಮ ಕಾರ್ಟ್ ಪ್ರಸ್ತುತ ಖಾಲಿಯಾಗಿದೆ. ನೀವು ಯಾವ ಉತ್ಪನ್ನಗಳನ್ನು ಹುಡುಕುತ್ತಿದ್ದೀರಿ ಎಂದು ತಿಳಿಸಿ!',
+    hi: 'आपका कार्ट वर्तमान में खाली है। मुझे बताएं कि आप कौन से उत्पाद खोज रहे हैं!',
+    ta: 'உங்கள் கூடை தற்போது காலியாக உள்ளது. நீங்கள் என்ன தயாரிப்புகளைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்!',
+    te: 'మీ కార్ట్ ప్రస్తుతం ఖాళీగా ఉంది. మీరు ఏ ఉత్పత్తుల కోసం చూస్తున్నారో నాకు చెప్పండి!',
+  },
+  cartSummary: (summary: string, subtotal: number, lang: string) => {
+    const formatted = subtotal.toLocaleString('en-IN');
+    switch (lang) {
+      case 'kn':
+        return `ನಿಮ್ಮ ಕಾರ್ಟ್‌ನಲ್ಲಿ ಇವುಗಳಿವೆ: ${summary}. ಒಟ್ಟು ಮೊತ್ತ: ₹${formatted}.`;
+      case 'hi':
+        return `आपके कार्ट में शामिल हैं: ${summary}। कुल राशि: ₹${formatted}।`;
+      case 'ta':
+        return `உங்கள் கூடையில் உள்ளவை: ${summary}. மொத்த தொகை: ₹${formatted}.`;
+      case 'te':
+        return `మీ కార్ట్‌లో ఇవి ఉన్నాయి: ${summary}. మొత్తం మొత్తం: ₹${formatted}.`;
+      default:
+        return `Your cart contains: ${summary}. Total amount: ₹${formatted}.`;
+    }
+  },
+  removedFromCart: (name: string, subtotal: number, lang: string) => {
+    const formatted = subtotal.toLocaleString('en-IN');
+    switch (lang) {
+      case 'kn':
+        return `ನಿಮ್ಮ ಕಾರ್ಟ್‌ನಿಂದ ${name} ಅನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ. ಉಳಿದ ಒಟ್ಟು ಮೊತ್ತ: ₹${formatted}.`;
+      case 'hi':
+        return `आपके कार्ट से ${name} हटा दिया गया है। शेष कुल राशि: ₹${formatted}।`;
+      case 'ta':
+        return `உங்கள் கூடையில் இருந்து ${name} அகற்றப்பட்டது. மீதமுள்ள மொத்தம்: ₹${formatted}.`;
+      case 'te':
+        return `మీ కార్ట్ నుండి ${name} తీసివేయబడింది. మిగిలిన మొత్తం: ₹${formatted}.`;
+      default:
+        return `Removed ${name} from your cart. Remaining total: ₹${formatted}.`;
+    }
+  },
+  cheapestOption: (name: string, price: number, lang: string) => {
+    const formatted = price.toLocaleString('en-IN');
+    switch (lang) {
+      case 'kn':
+        return `ಲಭ್ಯವಿರುವ ಅತ್ಯಂತ ಕಡಿಮೆ ಬೆಲೆಯ ಆಯ್ಕೆಯೆಂದರೆ ${name} - ₹${formatted}.`;
+      case 'hi':
+        return `उपलब्ध सबसे किफायती विकल्प ${name} है ₹${formatted} पर।`;
+      case 'ta':
+        return `கிடைக்கும் குறைந்த விலை தேர்வு ${name} - ₹${formatted}.`;
+      case 'te':
+        return `అందుబాటులో ఉన్న అత్యంత తక్కువ ధర ఎంపిక ${name} - ₹${formatted}.`;
+      default:
+        return `The cheapest available option is ${name} at ₹${formatted}.`;
+    }
+  },
+  compareOptions: (count: number, comparisons: string, lang: string) => {
+    switch (lang) {
+      case 'kn':
+        return `${count} ಆಯ್ಕೆಗಳನ್ನು ಹೋಲಿಸಲಾಗುತ್ತಿದೆ: ${comparisons}.`;
+      case 'hi':
+        return `${count} विकल्पों की तुलना की जा रही है: ${comparisons}।`;
+      case 'ta':
+        return `${count} விருப்பங்களை ஒப்பிடுதல்: ${comparisons}.`;
+      case 'te':
+        return `${count} ఎంపికలను పోల్చడం: ${comparisons}.`;
+      default:
+        return `Comparing ${count} options: ${comparisons}.`;
+    }
+  },
+  searchFound: (count: number, maxPrice: number | undefined, primaryName: string, primaryPrice: number, upsellText: string, lang: string) => {
+    const pPrice = primaryPrice.toLocaleString('en-IN');
+    const priceUnder = maxPrice ? (
+      lang === 'kn' ? ` ₹${maxPrice.toLocaleString('en-IN')} ಒಳಗೆ` :
+      lang === 'hi' ? ` ₹${maxPrice.toLocaleString('en-IN')} के तहत` :
+      lang === 'ta' ? ` ₹${maxPrice.toLocaleString('en-IN')} கீழ்` :
+      lang === 'te' ? ` ₹${maxPrice.toLocaleString('en-IN')} లోపు` :
+      ` under ₹${maxPrice.toLocaleString('en-IN')}`
+    ) : '';
+
+    switch (lang) {
+      case 'kn':
+        return `ನಾನು ${count} ಹೊಂದಾಣಿಕೆಯ ಉತ್ಪನ್ನಗಳನ್ನು ಕಂಡುಕೊಂಡಿದ್ದೇನೆ${priceUnder}. ₹${pPrice} ಬೆಲೆಯ ${primaryName} ಅತ್ಯುತ್ತಮ ಲಭ್ಯತೆಯೊಂದಿಗೆ ಉತ್ತಮ ಆಯ್ಕೆಯಾಗಿದೆ.${upsellText ? ' ' + upsellText : ''}`;
+      case 'hi':
+        return `मुझे ${count} मेल खाने वाले उत्पाद मिले हैं${priceUnder}। ₹${pPrice} पर ${primaryName} मजबूत उपलब्धता के साथ एक शानदार विकल्प है।${upsellText ? ' ' + upsellText : ''}`;
+      case 'ta':
+        return `பொருந்தக்கூடிய ${count} தயாரிப்புகளைக் கண்டறிந்துள்ளேன்${priceUnder}. ₹${pPrice} விலையுள்ள ${primaryName} சிறந்த தேர்வாகும்.${upsellText ? ' ' + upsellText : ''}`;
+      case 'te':
+        return `నేను ${count} సరిపోలే ఉత్పత్తులను కనుగొన్నాను${priceUnder}. ₹${pPrice} వద్ద ${primaryName} బలమైన లభ్యతతో గొప్ప ఎంపిక.${upsellText ? ' ' + upsellText : ''}`;
+      default:
+        return `I found ${count} matching product${count > 1 ? 's' : ''}${priceUnder}. The ${primaryName} at ₹${pPrice} is a great choice with strong availability.${upsellText ? ' ' + upsellText : ''}`;
+    }
+  },
+  searchNotFound: {
+    en: "I couldn't find products matching your criteria in the catalog. Please try a different price or category.",
+    kn: 'ಕ್ಯಾಟಲಾಗ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಮಾನದಂಡಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವ ಉತ್ಪನ್ನಗಳು ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೇರೆ ಬೆಲೆ ಅಥವಾ ವರ್ಗವನ್ನು ಪ್ರಯತ್ನಿಸಿ.',
+    hi: 'कैटलॉग में आपके मानदंडों से मेल खाने वाले उत्पाद नहीं मिले। कृपया भिन्न मूल्य या श्रेणी का प्रयास करें.',
+    ta: 'பட்டியலில் உங்கள் அளவுகோல்களுக்கு பொருந்தக்கூடிய தயாரிப்புகள் கிடைக்கவில்லை. தயவுசெய்து வேறு விலை அல்லது வகையை முயற்சிக்கவும்.',
+    te: 'కేటలాగ్‌లో మీ ప్రమాణాలకు సరిపోలే ఉత్పత్తులు కనుగొనబడలేదు. దయచేసి వేరే ధర లేదా వర్గాన్ని ప్రయత్నించండి.',
+  },
+  generalGreeting: {
+    en: 'Hello! I am your SellPilot AI commerce assistant. You can ask me to search products (e.g. "laptops under 1 lakh"), check inventory, compare items, or add products to your cart.',
+    kn: 'ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ SellPilot AI ವಾಣಿಜ್ಯ ಸಹಾಯಕ. ನೀವು ಉತ್ಪನ್ನಗಳನ್ನು ಹುಡುಕಲು ("1 ಲಕ್ಷ ಒಳಗೆ ಲ್ಯಾಪ್‌ಟಾಪ್"), ದಾಸ್ತಾನು ಪರಿಶೀಲಿಸಲು ಅಥವಾ ಕಾರ್ಟ್‌ಗೆ ಸೇರಿಸಲು ಕೇಳಬಹುದು.',
+    hi: 'नमस्ते! मैं आपका SellPilot AI वाणिज्य सहायक हूँ। आप मुझसे उत्पाद खोजने ("1 लाख के तहत लैपटॉप"), इन्वेंट्री जांचने या कार्ट में आइटम जोड़ने के लिए कह सकते हैं।',
+    ta: 'வணக்கம்! நான் உங்கள் SellPilot AI வர்த்தக உதவியாளர். நீங்கள் தயாரிப்புகளைத் தேடலாம் ("1 லட்சத்திற்குள் லேப்டாப்"), இருப்பை சரிபார்க்கலாம் அல்லது வண்டியில் சேர்க்கலாம்.',
+    te: 'నమస్కారం! నేను మీ SellPilot AI వాణిజ్య సహాయకుడిని. మీరు ఉత్పత్తులను శోధించవచ్చు ("1 లక్ష లోపు ల్యాప్‌టాప్‌లు"), ఇన్వెంటరీని తనిఖీ చేయవచ్చు లేదా కార్ట్‌కు జోడించవచ్చు.',
+  },
+  currencyExplanation: {
+    en: 'In Indian commerce, 1 Lakh (₹1,00,000) equals 100,000 INR. For example, "laptop under 1 lakh" searches for all laptops priced up to ₹1,00,000.',
+    kn: 'ಭಾರತೀಯ ವಾಣಿಜ್ಯದಲ್ಲಿ 1 ಲಕ್ಷ (₹1,00,000) ಎಂದರೆ 100,000 ರೂಪಾಯಿಗಳು. ಉದಾಹರಣೆಗೆ "1 ಲಕ್ಷ ಒಳಗೆ ಲ್ಯಾಪ್‌ಟಾಪ್" ಎಂದರೆ ₹1,00,000 ವರೆಗಿನ ಎಲ್ಲಾ ಲ್ಯಾಪ್‌ಟಾಪ್‌ಗಳನ್ನು ಹುಡುಕುತ್ತದೆ.',
+    hi: 'भारतीय वाणिज्य में 1 लाख (₹1,00,000) का अर्थ 1,00,000 (एक सौ हजार) रुपये होता है। उदाहरण के लिए "1 लाख के तहत लैपटॉप" ₹1,00,000 तक के सभी लैपटॉप खोजता है।',
+    ta: 'இந்திய வர்த்தகத்தில் 1 லட்சம் (₹1,00,000) என்பது 100,000 ரூபாயைக் குறிக்கும். உதாரணத்திற்கு "1 லட்சத்திற்குள் லேப்டாப்" என்பது ₹1,00,000 வரையிலான அனைத்து லேப்டாப்புகளையும் தேடுகிறது.',
+    te: 'భారతీయ వాణిజ్యంలో 1 లక్ష (₹1,00,000) అంటే 100,000 రూపాయలు. ఉదాహరణకు "1 లక్ష లోపు ల్యాప్‌టాప్" అంటే ₹1,00,000 వరకు ఉండే అన్ని ల్యాప్‌టాప్‌లను శోధిస్తుంది.',
+  }
+};
+
+const LOCALIZED_MERCHANT_STRINGS = {
+  clarification: {
+    en: 'Which product or category are you referring to? Please specify so I can retrieve the accurate catalog details.',
+    kn: 'ನೀವು ಯಾವ ಉತ್ಪನ್ನ ಅಥವಾ ವರ್ಗವನ್ನು ಉಲ್ಲೇಖಿಸುತ್ತಿದ್ದೀರಿ? ದಯವಿಟ್ಟು ನಿರ್ದಿಷ್ಟಪಡಿಸಿ ಇದರಿಂದ ನಾನು ನಿಖರವಾದ ಕ್ಯಾಟಲಾಗ್ ವಿವರಗಳನ್ನು ಪಡೆಯಬಹುದು.',
+    hi: 'आप किस उत्पाद या श्रेणी का संदर्भ ले रहे हैं? कृपया स्पष्ट करें ताकि मैं सटीक कैटलॉग विवरण प्राप्त कर सकूँ।',
+    ta: 'நீங்கள் எந்த தயாரிப்பு அல்லது வகையைக் குறிப்பிடுகிறீர்கள்? துல்லியமான பட்டியலை மீட்டெடுக்க தயவுசெய்து குறிப்பிடவும்.',
+    te: 'మీరు ఏ ఉత్పత్తి లేదా వర్గాన్ని సూచిస్తున్నారు? దయచేసి పేర్కొనండి తద్వారా నేను ఖచ్చితమైన కేటలాగ్ వివరాలను తిరిగి పొందగలను.',
+  },
+  discountExceeded: (requestedPct: number, maxAllowed: number, lang: string) => {
+    switch (lang) {
+      case 'kn':
+        return `ನಾನು ${requestedPct}% ರಿಯಾಯಿತಿಯನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ ಏಕೆಂದರೆ ಅದು ನಿಮ್ಮ ಕಾನ್ಫಿಗರ್ ಮಾಡಿದ ಮಿತಿಯಾದ ${maxAllowed}% ಅನ್ನು ಮೀರಿದೆ. ಸುರಕ್ಷಿತ ಮಿತಿ ${maxAllowed}% ವರೆಗೆ ಇರುತ್ತದೆ.`;
+      case 'hi':
+        return `मैं ${requestedPct}% छूट की सिफारिश नहीं कर सकता क्योंकि यह आपकी कॉन्फ़िगर की गई सीमा ${maxAllowed}% से अधिक है। सुरक्षित सीमा ${maxAllowed}% तक है।`;
+      case 'ta':
+        return `நான் ${requestedPct}% தள்ளுபடியை பரிந்துரைக்க முடியாது, ஏனெனில் இது உங்கள் கட்டமைக்கப்பட்ட வரம்பான ${maxAllowed}% ஐ விட அதிகமாக உள்ளது. பாதுகாப்பான வரம்பு ${maxAllowed}% வரை.`;
+      case 'te':
+        return `నేను ${requestedPct}% తగ్గింపును సిఫార్సు చేయలేను ఎందుకంటే ఇది మీరు కాన్ఫిగర్ చేసిన పరిమితి ${maxAllowed}% కంటే ఎక్కువగా ఉంది. సురక్షిత పరిమితి ${maxAllowed}% వరకు ఉంటుంది.`;
+      default:
+        return `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of ${maxAllowed}%. Safe limit is up to ${maxAllowed}%.`;
+    }
+  },
+  discountApproved: (pct: number, targetName: string, priceDisplay: string, discountedPrice: string, lang: string) => {
+    switch (lang) {
+      case 'kn':
+        return `ರಿಯಾಯಿತಿ ಪರಿಶೀಲನೆ ವಿವರ:
+• ಉತ್ಪನ್ನ: ${targetName}${priceDisplay}
+• ರಿಯಾಯಿತಿ: ${pct}% ರಿಯಾಯಿತಿ ಸುರಕ್ಷಿತವಾಗಿದೆ ಮತ್ತು ಅಂಗಡಿಯ 25% ಮಾರ್ಜಿನ್ ಮಿತಿಯೊಳಗಿದೆ${discountedPrice}.
+• ವ್ಯಾಪಾರ ಪರಿಣಾಮ: ಆರೋಗ್ಯಕರ ಲಾಭವನ್ನು ಉಳಿಸಿಕೊಂಡು ಚೆಕ್‌ಔಟ್ ಪರಿಮಾಣವನ್ನು ಹೆಚ್ಚಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.`;
+      case 'hi':
+        return `छूट मूल्यांकन परिणाम:
+• उत्पाद: ${targetName}${priceDisplay}
+• स्वीकृत छूट: ${pct}% की छूट सुरक्षित है और आपकी दुकान की 25% मार्जिन सीमा के भीतर है${discountedPrice}।
+• व्यावसायिक प्रभाव: स्वस्थ लाभ मार्जिन बनाए रखते हुए बिक्री बढ़ाने में मदद करेगा।`;
+      case 'ta':
+        return `தள்ளுபடி மதிப்பீடு:
+• தயாரிப்பு: ${targetName}${priceDisplay}
+• அனுமதிக்கப்பட்ட தள்ளுபடி: ${pct}% தள்ளுபடி பாதுகாப்பானது மற்றும் கடையின் 25% வரம்பிற்குள் உள்ளது${discountedPrice}.
+• வணிக தாக்கம்: ஆரோக்கியமான லாப வரம்புகளைப் பாதுகாத்து விற்பனையை அதிகரிக்கும்.`;
+      case 'te':
+        return `తగ్గింపు మూల్యాంకనం:
+• ఉత్పత్తి: ${targetName}${priceDisplay}
+• ఆమోదించబడిన తగ్గింపు: ${pct}% తగ్గింపు సురక్షితమైనది మరియు 25% మార్జిన్ పరిమితిలో ఉంది${discountedPrice}.
+• వ్యాపార ప్రభావం: లాభాలను కాపాడుకుంటూ ఆర్డర్ల పరిమాణాన్ని పెంచుతుంది.`;
+      default:
+        return `Promotion Evaluation for ${targetName}:
+• Product & Price: ${targetName}${priceDisplay}
+• Discount Assessment: ${pct}% discount is safe and within your store's 25% margin ceiling${discountedPrice}.
+• Strategic Impact: Stimulates checkout volume while preserving healthy profit margins.`;
+    }
+  },
+  bestOpportunity: (name: string, category: string, priceDisplay: string, stockDisplay: string, reason: string | undefined, lang: string) => {
+    switch (lang) {
+      case 'kn':
+        return `ಪ್ರಸ್ತುತ ನಿಮ್ಮ ಅತ್ಯುತ್ತಮ ಅವಕಾಶ:
+• ಉತ್ಪನ್ನ: ${category}ನಲ್ಲಿರುವ ${name}
+• ಬೆಲೆ & ದಾಸ್ತಾನು: ${priceDisplay}, ${stockDisplay}
+• ಕಾರಣ: ${reason || 'ಇದು ಗರಿಷ್ಠ ಆದಾಯಕ್ಕಾಗಿ ಬಲವಾದ ದಾಸ್ತಾನು ಮತ್ತು ಉತ್ತಮ ಮಾರ್ಜಿನ್ ಅನ್ನು ಸಂಯೋಜಿಸುತ್ತದೆ.'}`;
+      case 'hi':
+        return `वर्तमान में आपका सबसे अच्छा अवसर:
+• उत्पाद: ${category} में ${name}
+• मूल्य और स्टॉक: ${priceDisplay}, ${stockDisplay}
+• रणनीतिक कारण: ${reason || 'यह अधिकतम राजस्व के लिए मजबूत इन्वेंट्री और स्वस्थ मार्जिन को जोड़ता है।'}`;
+      case 'ta':
+        return `தற்போதைய சிறந்த வாய்ப்பு:
+• தயாரிப்பு: ${category} இல் உள்ள ${name}
+• விலை & இருப்பு: ${priceDisplay}, ${stockDisplay}
+• வணிக காரணம்: ${reason || 'இது அதிக வருவாய்க்காக வலுவான இருப்பு மற்றும் ஆரோக்கியமான லாபத்தை இணைக்கிறது.'}`;
+      case 'te':
+        return `ప్రస్తుత ఉత్తమ అవకాశం:
+• ఉత్పత్తి: ${category} లోని ${name}
+• ధర & స్టాక్: ${priceDisplay}, ${stockDisplay}
+• వ్యూహాత్మక కారణం: ${reason || 'ఇది గరిష్ట రాబడి కోసం బలమైన ఇన్వెంటరీ మరియు ఆరోగ్యకరమైన మార్జిన్‌ను మిళితం చేస్తుంది.'}`;
+      default:
+        return `Top Recommended Opportunity:
+• Product: ${name} (${category})
+• Price & Stock: ${priceDisplay}, ${stockDisplay}
+• Strategic Value: ${reason || 'Combines strong inventory depth with healthy margins for maximum revenue velocity.'}`;
+    }
+  },
+  followUpReason: (name: string, stock: number | undefined, category: string, price: number | undefined, lang: string) => {
+    const formattedPrice = price ? `₹${price.toLocaleString('en-IN')}` : 'standard price';
+    const stockUnits = stock !== undefined ? `${stock} units` : 'healthy volume';
+    switch (lang) {
+      case 'kn':
+        return `${name} ಅನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಪ್ರಮುಖ ಅಂಶಗಳು:
+• ವರ್ಗ & ಬೆಲೆ: ${category}, ${formattedPrice}
+• ದಾಸ್ತಾನು ಲಭ್ಯತೆ: ${stockUnits} ಲಭ್ಯವಿದೆ (ಬಲವಾದ ದಾಸ್ತಾನು)
+• ಲಾಭದ ರಕ್ಷಣೆ: ಗ್ರಾಹಕರ ಬೇಡಿಕೆಯನ್ನು ಪೂರೈಸುವ ಜತೆಗೆ ಆರೋಗ್ಯಕರ ಲಾಭವನ್ನು ಖಚಿತಪಡಿಸುತ್ತದೆ.`;
+      case 'hi':
+        return `${name} की सिफारिश के मुख्य कारण:
+• श्रेणी और मूल्य: ${category} पर ${formattedPrice}
+• इन्वेंटरी स्थिति: ${stockUnits} उपलब्ध (मजबूत स्टॉक स्तर)
+• लाभ मार्जिन: स्वस्थ लाभ मार्जिन बनाए रखते हुए ग्राहक मांग को कुशलतापूर्वक पूरा करता है।`;
+      case 'ta':
+        return `${name} பரிந்துரைக்கப்படுவதற்கான முக்கிய காரணங்கள்:
+• வகை & விலை: ${category}, ${formattedPrice}
+• இருப்பு நிலை: ${stockUnits} கையிருப்பில் உள்ளது
+• லாப பாதுகாப்பு: வாடிக்கையாளர் தேவையை பூர்த்தி செய்து உறுதியான லாபத்தை உறுதி செய்கிறது.`;
+      case 'te':
+        return `${name} సిఫార్సు చేయడానికి గల ముఖ్య కారణాలు:
+• వర్గం & ధర: ${category}, ${formattedPrice}
+• స్టాక్ లభ్యత: ${stockUnits} అందుబాటులో ఉన్నాయి
+• లాభ రక్షణ: డిమాండ్‌ను తీరుస్తూ మంచి లాభాలను నిర్ధారిస్తుంది.`;
+      default:
+        return `Key reasons to promote ${name}:
+• Category & Pricing: ${category} at ${formattedPrice}
+• Inventory Health: ${stockUnits} in stock (healthy inventory depth)
+• Margin & Demand: Captures customer demand while maintaining sound profit margins.`;
+    }
+  },
+  alternativeProduct: (name: string, category: string, priceDisplay: string, stockDisplay: string, lang: string) => {
+    switch (lang) {
+      case 'kn':
+        return `ಪರ್ಯಾಯ ಉತ್ಪನ್ನದ ವಿವರಗಳು:
+• ಉತ್ಪನ್ನ: ${category}ನಲ್ಲಿರುವ ${name}
+• ಬೆಲೆ & ದಾಸ್ತಾನು: ${priceDisplay}, ${stockDisplay}
+• ಪಾತ್ರ: ಈ ವರ್ಗದಲ್ಲಿ ಗ್ರಾಹಕರಿಗೆ ಸೂಕ್ತವಾದ ಆಯ್ಕೆಯಾಗಿದೆ.`;
+      case 'hi':
+        return `वैकल्पिक उत्पाद विवरण:
+• उत्पाद: ${category} में ${name}
+• मूल्य और स्टॉक: ${priceDisplay}, ${stockDisplay}
+• अवसर: इस श्रेणी में ब्राउज़ करने वाले ग्राहकों के लिए उपयुक्त विकल्प।`;
+      case 'ta':
+        return `மாற்று தயாரிப்பு விவரம்:
+• தயாரிப்பு: ${category} இல் உள்ள ${name}
+• விலை & இருப்பு: ${priceDisplay}, ${stockDisplay}
+• வாய்ப்பு: வாடிக்கையாளர்களுக்கு சிறந்த மாற்றுத் தேர்வு.`;
+      case 'te':
+        return `ప్రత్యామ్నాయ ఉత్పత్తి వివరాలు:
+• ఉత్పత్తి: ${category} లోని ${name}
+• ధర & స్టాక్: ${priceDisplay}, ${stockDisplay}
+• పాత్ర: ఈ కేటగిరీలో చూసే కస్టమర్ల కోసం అనుకూలమైన ప్రత్యామ్నాయం.`;
+      default:
+        return `Alternative Catalog Product:
+• Product: ${name} in ${category}
+• Price & Stock: ${priceDisplay}, ${stockDisplay}
+• Role: Serves as a viable alternative for customers browsing this line.`;
+    }
+  },
+  categoryPromotion: (category: string, name: string, reason: string | undefined, lang: string) => {
+    const defaultReason = reason || 'High stock with healthy margin';
+    switch (lang) {
+      case 'kn':
+        return `ನಿಮ್ಮ ${category} ಸಂಗ್ರಹಕ್ಕಾಗಿ ಪ್ರಚಾರದ ಶಿಫಾರಸು:
+• ಪ್ರಮುಖ ಉತ್ಪನ್ನ: ${name}
+• ಕಾರಣ: ${defaultReason}`;
+      case 'hi':
+        return `आपके ${category} संग्रह के लिए प्रचार सिफारिश:
+• प्रमुख उत्पाद: ${name}
+• रणनीतिक कारण: ${defaultReason}`;
+      case 'ta':
+        return `உங்கள் ${category} தொகுப்பிற்கான விளம்பர பரிந்துரை:
+• முதன்மை தயாரிப்பு: ${name}
+• முக்கிய காரணம்: ${defaultReason}`;
+      case 'te':
+        return `మీ ${category} సేకరణ కోసం ప్రమోషన్ సిఫార్సు:
+• ప్రధాన ఉత్పత్తి: ${name}
+• వ్యూహాత్మక కారణం: ${defaultReason}`;
+      default:
+        return `Recommended promotion for your ${category} collection:
+• Top Candidate: ${name}
+• Strategic Advantage: ${defaultReason}`;
+    }
+  }
+};
 
 export class AgentService {
   /**
@@ -283,6 +593,24 @@ export class AgentService {
     const { intent, requirements, rawMessage } = intentResult;
     const toolsExecuted: ToolExecutionSummary[] = [];
 
+    // CASE 0: General Greetings & Currency / 1 Lakh Explanation
+    if (intent === 'GENERAL_ASSISTANCE' && !requirements.category) {
+      const isLakhQuery = /\b(lakh|lac|1 lakh|100000|crore|thousand)\b/i.test(rawMessage);
+      const msg = isLakhQuery
+        ? (LOCALIZED_BUYER_STRINGS.currencyExplanation[language as 'en' | 'kn' | 'hi' | 'ta' | 'te'] || LOCALIZED_BUYER_STRINGS.currencyExplanation.en)
+        : (LOCALIZED_BUYER_STRINGS.generalGreeting[language as 'en' | 'kn' | 'hi' | 'ta' | 'te'] || LOCALIZED_BUYER_STRINGS.generalGreeting.en);
+
+      return {
+        success: true,
+        intent: 'GENERAL_ASSISTANCE',
+        message: msg,
+        language,
+        mode: 'buyer',
+        toolsExecuted,
+        conversationId: context.conversationId,
+      };
+    }
+
     // CASE 1: Checkout / Payment Request
     if (intent === 'PURCHASE_REQUEST' || intent === 'PAYMENT_REQUEST') {
       // Execute calculateCart tool to verify final amounts
@@ -305,7 +633,7 @@ export class AgentService {
       return {
         success: true,
         intent: 'PURCHASE_REQUEST',
-        message: 'Your total is ready. Ready to continue to secure Razorpay Test Mode checkout?',
+        message: LOCALIZED_BUYER_STRINGS.checkoutPrompt[language as 'en' | 'kn' | 'hi' | 'ta' | 'te'] || LOCALIZED_BUYER_STRINGS.checkoutPrompt.en,
         language,
         mode: 'buyer',
         toolsExecuted,
@@ -417,7 +745,13 @@ export class AgentService {
         return {
           success: true,
           intent: 'ADD_TO_CART',
-          message: `I've added ${itemName} (₹${addResult.data.addedItem.price}) to your cart. Your cart now has ${addResult.data.totalItems} item${addResult.data.totalItems > 1 ? 's' : ''} totaling ₹${addResult.data.subtotal.toLocaleString('en-IN')}.`,
+          message: LOCALIZED_BUYER_STRINGS.addedToCart(
+            itemName,
+            addResult.data.addedItem.price,
+            addResult.data.totalItems,
+            addResult.data.subtotal,
+            language
+          ),
           language,
           mode: 'buyer',
           cart: {
@@ -463,10 +797,10 @@ export class AgentService {
         const items = cartResult.data.items;
         let responseMsg = '';
         if (items.length === 0) {
-          responseMsg = 'Your cart is currently empty. Tell me what products you are looking for!';
+          responseMsg = LOCALIZED_BUYER_STRINGS.cartEmpty[language as 'en' | 'kn' | 'hi' | 'ta' | 'te'] || LOCALIZED_BUYER_STRINGS.cartEmpty.en;
         } else {
           const itemSummary = items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ');
-          responseMsg = `Your cart contains: ${itemSummary}. Total amount: ₹${cartResult.data.subtotal.toLocaleString('en-IN')}.`;
+          responseMsg = LOCALIZED_BUYER_STRINGS.cartSummary(itemSummary, cartResult.data.subtotal, language);
         }
 
         return {
@@ -507,7 +841,11 @@ export class AgentService {
         return {
           success: true,
           intent: 'REMOVE_FROM_CART',
-          message: `Removed ${removeResult.data.removedName || targetIdentifier} from your cart. Remaining total: ₹${removeResult.data.subtotal.toLocaleString('en-IN')}.`,
+          message: LOCALIZED_BUYER_STRINGS.removedFromCart(
+            removeResult.data.removedName || targetIdentifier,
+            removeResult.data.subtotal,
+            language
+          ),
           language,
           mode: 'buyer',
           toolsExecuted,
@@ -538,8 +876,12 @@ export class AgentService {
         const items = compareResult.data.comparison;
         const cheapest = items[0];
         const msg = requirements.isCheapestRequested
-          ? `The cheapest available option is ${cheapest.name} at ₹${cheapest.price.toLocaleString('en-IN')}.`
-          : `Comparing ${items.length} options: ${items.map((it: any) => `${it.name} (₹${it.price})`).join(' vs ')}.`;
+          ? LOCALIZED_BUYER_STRINGS.cheapestOption(cheapest.name, cheapest.price, language)
+          : LOCALIZED_BUYER_STRINGS.compareOptions(
+              items.length,
+              items.map((it: any) => `${it.name} (₹${it.price})`).join(' vs '),
+              language
+            );
 
         cacheRecentProducts(
           sessionKey,
@@ -692,7 +1034,7 @@ export class AgentService {
       return {
         success: true,
         intent: intent || 'PRODUCT_SEARCH',
-        message: "I couldn't find products matching your criteria in the catalog. Please try a different price or category.",
+        message: LOCALIZED_BUYER_STRINGS.searchNotFound[language as 'en' | 'kn' | 'hi' | 'ta' | 'te'] || LOCALIZED_BUYER_STRINGS.searchNotFound.en,
         language,
         mode: 'buyer',
         products: [],
@@ -701,57 +1043,85 @@ export class AgentService {
       };
     }
 
-    // Execute upsell and cross-sell tools for primary product
-    const primary = foundProducts[0];
-    let upsellPayload = null;
-    let crossSellsPayload: any[] = [];
+    // Execute upsell and cross-sell tools for ALL returned products so every product has recommendations
+    const productsWithRecommendations = await Promise.all(
+      foundProducts.map(async (prod, idx) => {
+        try {
+          const [upsellRes, crossRes] = await Promise.all([
+            ToolExecutionService.executeTool({
+              toolName: 'getUpsell',
+              arguments: { productId: prod.id, name: prod.name },
+              context,
+            }),
+            ToolExecutionService.executeTool({
+              toolName: 'getCrossSells',
+              arguments: { productId: prod.id, name: prod.name },
+              context,
+            }),
+          ]);
 
-    if (primary) {
-      const [upsellRes, crossRes] = await Promise.all([
-        ToolExecutionService.executeTool({
-          toolName: 'getUpsell',
-          arguments: { productId: primary.id, name: primary.name },
-          context,
-        }),
-        ToolExecutionService.executeTool({
-          toolName: 'getCrossSells',
-          arguments: { productId: primary.id, name: primary.name },
-          context,
-        }),
-      ]);
+          const prodUpsell = upsellRes.success && upsellRes.data?.upsell ? upsellRes.data.upsell : null;
+          const prodCrossSells = crossRes.success && crossRes.data?.crossSells ? crossRes.data.crossSells : [];
 
-      if (upsellRes.success && upsellRes.data?.upsell) {
-        upsellPayload = upsellRes.data.upsell;
-        toolsExecuted.push({
-          tool: 'getUpsell',
-          arguments: upsellRes.arguments,
-          success: true,
-          resultSummary: `Found upsell: ${upsellPayload.name}`,
-          executionTimeMs: upsellRes.executionTimeMs,
-        });
-      }
+          if (idx === 0) {
+            if (prodUpsell) {
+              toolsExecuted.push({
+                tool: 'getUpsell',
+                arguments: upsellRes.arguments,
+                success: true,
+                resultSummary: `Found upsell: ${prodUpsell.name}`,
+                executionTimeMs: upsellRes.executionTimeMs,
+              });
+            }
+            if (prodCrossSells.length > 0) {
+              toolsExecuted.push({
+                tool: 'getCrossSells',
+                arguments: crossRes.arguments,
+                success: true,
+                resultSummary: `Found ${prodCrossSells.length} cross-sell accessory item(s)`,
+                executionTimeMs: crossRes.executionTimeMs,
+              });
+            }
+          }
 
-      if (crossRes.success && crossRes.data?.crossSells) {
-        crossSellsPayload = crossRes.data.crossSells;
-        toolsExecuted.push({
-          tool: 'getCrossSells',
-          arguments: crossRes.arguments,
-          success: true,
-          resultSummary: `Found ${crossSellsPayload.length} cross-sell accessory item(s)`,
-          executionTimeMs: crossRes.executionTimeMs,
-        });
-      }
-    }
+          return {
+            ...prod,
+            upsell: prodUpsell,
+            crossSells: prodCrossSells,
+          };
+        } catch {
+          return prod;
+        }
+      })
+    );
 
-    let responseText = `I found ${foundProducts.length} matching product${foundProducts.length > 1 ? 's' : ''}`;
-    if (requirements.maxPrice) {
-      responseText += ` under ₹${requirements.maxPrice.toLocaleString('en-IN')}`;
-    }
-    responseText += `. The ${primary.name} at ₹${primary.price.toLocaleString('en-IN')} is a great choice with strong availability.`;
+    const primary = productsWithRecommendations[0];
+    const upsellPayload = primary?.upsell || null;
+    const crossSellsPayload = primary?.crossSells || [];
 
+    let upsellText = '';
     if (upsellPayload) {
-      responseText += ` We also offer ${upsellPayload.name} for ₹${upsellPayload.priceDiff} more.`;
+      if (language === 'kn') {
+        upsellText = `ನಾವು ₹${upsellPayload.priceDiff} ಹೆಚ್ಚು ಬೆಲೆಗೆ ${upsellPayload.name} ಅನ್ನು ಸಹ ನೀಡುತ್ತೇವೆ.`;
+      } else if (language === 'hi') {
+        upsellText = `हम ₹${upsellPayload.priceDiff} अधिक में ${upsellPayload.name} भी प्रदान करते हैं।`;
+      } else if (language === 'ta') {
+        upsellText = `நாங்கள் ₹${upsellPayload.priceDiff} கூடுதலில் ${upsellPayload.name} ஐயும் வழங்குகிறோம்.`;
+      } else if (language === 'te') {
+        upsellText = `మేము ₹${upsellPayload.priceDiff} ఎక్కువకు ${upsellPayload.name} ను కూడా అందిస్తున్నాము.`;
+      } else {
+        upsellText = `We also offer ${upsellPayload.name} for ₹${upsellPayload.priceDiff} more.`;
+      }
     }
+
+    const responseText = LOCALIZED_BUYER_STRINGS.searchFound(
+      productsWithRecommendations.length,
+      requirements.maxPrice,
+      primary.name,
+      primary.price,
+      upsellText,
+      language
+    );
 
     return {
       success: true,
@@ -759,7 +1129,7 @@ export class AgentService {
       message: responseText,
       language,
       mode: 'buyer',
-      products: foundProducts,
+      products: productsWithRecommendations,
       upsell: upsellPayload,
       crossSells: crossSellsPayload.slice(0, 2),
       toolsExecuted,
@@ -876,7 +1246,7 @@ export class AgentService {
 
     // 1. Guardrail for missing context on ambiguous referential queries (e.g. "What about the other product?")
     if (requirements.isAlternativeReferenced && !state.lastProduct && !state.lastCategory && !requirements.category) {
-      const clarificationMsg = 'Which product or category are you referring to? Please specify so I can retrieve the accurate catalog details.';
+      const clarificationMsg = LOCALIZED_MERCHANT_STRINGS.clarification[language as 'en'|'kn'|'hi'|'ta'|'te'] || LOCALIZED_MERCHANT_STRINGS.clarification.en;
       state.history.push({ role: 'user', content: rawMessage });
       state.history.push({ role: 'assistant', content: clarificationMsg });
       if (state.history.length > 8) state.history = state.history.slice(-8);
@@ -924,7 +1294,7 @@ export class AgentService {
         });
 
         if (!discountValidationRes.data.valid) {
-          const rejectMsg = `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of ${maxAllowed}%. Safe limit is up to ${maxAllowed}%.`;
+          const rejectMsg = LOCALIZED_MERCHANT_STRINGS.discountExceeded(requestedPct, maxAllowed, language);
           state.lastDiscountPercentage = requestedPct;
           state.history.push({ role: 'user', content: rawMessage });
           state.history.push({ role: 'assistant', content: rejectMsg });
@@ -1020,18 +1390,28 @@ export class AgentService {
     const provider = isTestEnv ? 'none' : resolveAiProvider();
     if (provider === 'nvidia' || provider === 'gemini') {
       try {
+        const targetLangName = LANGUAGE_NAMES[language] || 'English';
         const systemPrompt = `You are SellPilot AI's intelligent merchant revenue copilot.
 You assist the store owner with pricing strategy, product promotions, cross-sells, upsells, and inventory optimization.
 CRITICAL RULES:
 1. Ground all answers ONLY in the provided merchant catalog facts, metrics, and policy rules.
-2. NEVER invent products, prices, margins, or fictional discounts.
-3. Maximum allowed promotion discount is 25%. Any higher discount must be rejected.
-4. When the merchant asks about another product or alternative ("What about the other shoe?", "What about the second one?"), answer the contextual product comparison directly using its actual catalog details and relationship. Do NOT invent any discount percentage or promotion recommendation unless explicitly requested.
-5. Answer the store owner's exact question directly, professionally, and concisely (1-3 sentences).
-6. Explain the underlying business reason (inventory depth, margin, or revenue potential) when appropriate.
+2. Target response language: ${targetLangName}. Respond fluently in ${targetLangName}.
+3. STRICT GROUNDING: NEVER translate or alter product names (e.g. 'Pro Carbon Running Shoes'), SKUs, exact numerical prices with ₹ symbol (e.g. '₹2,999'), or stock quantities. Keep them exactly as provided in the catalog facts.
+4. Maximum allowed promotion discount is 25%. Any higher discount must be rejected.
+5. POINT-WISE FORMAT & READABILITY MANDATE:
+   - DO NOT write dense, unbroken paragraphs.
+   - Present your answer using clear, point-wise bullet points (•) that are fast to scan and understand.
+   - Start with 1 short, direct summary line.
+   - Follow with 2 to 4 structured, easy-to-read bullet points containing ALL required details:
+     • **Product & Pricing**: Exact product name, current catalog price (₹), and current stock units.
+     • **Business Logic**: Why this recommendation works (inventory depth, margin safety, cash flow, or demand velocity).
+     • **Synergy / Action**: Suggested pairing (cross-sell or upsell item with exact name and price) or discount boundary (up to 25% max).
+   - Keep language plain, direct, and scannable without omitting any commercial details or numbers.
+6. When the merchant asks about another product or alternative ("What about the other shoe?", "What about the second one?"), answer the contextual product comparison directly using its actual catalog details and relationship. Do NOT invent any discount percentage or promotion recommendation unless explicitly requested.
 7. For follow-up questions, maintain context from previous turns.`;
 
-        const factsPrompt = `Merchant Store Facts & Insights:
+        const factsPrompt = `Target Response Language: ${targetLangName} (Language code: ${language})
+Merchant Store Facts & Insights:
 - Best Opportunity Product: ${bestOpportunity ? `${bestOpportunity.name} (${bestOpportunity.category}, ₹${bestOpportunity.price}, ${bestOpportunity.stock} in stock - ${bestOpportunity.reason || 'High upside'})` : 'None'}
 - Top Promotion Candidate: ${topOpportunity ? `${topOpportunity.name} (${topOpportunity.category}, ₹${topOpportunity.price}, ${topOpportunity.stock} in stock - ${topOpportunity.reason})` : 'None'}
 - Category Focus: ${categoryOpportunity ? `${categoryOpportunity.name} (${categoryOpportunity.category}, ₹${categoryOpportunity.price}, ${categoryOpportunity.stock} in stock)` : activeCategory || 'None'}
@@ -1072,7 +1452,7 @@ Sub-Intent: ${subIntent || 'GENERAL'}`;
         const targetPrice = targetProduct?.price;
         const priceDisplay = targetPrice ? ` (₹${targetPrice.toLocaleString('en-IN')})` : '';
         const discountedPrice = targetPrice ? ` (discounted to ₹${Math.round(targetPrice * (1 - requestedPct / 100)).toLocaleString('en-IN')})` : '';
-        responseText = `A ${requestedPct}% discount on ${targetName}${priceDisplay} is safe and within your store's 25% margin ceiling${discountedPrice}. It will help stimulate checkout volume while preserving healthy profit margins.`;
+        responseText = LOCALIZED_MERCHANT_STRINGS.discountApproved(requestedPct, targetName, priceDisplay, discountedPrice, language);
       } else if (requirements.isAlternativeReferenced && resolvedAlternative) {
         const priceDisplay = resolvedAlternative.price !== undefined ? `₹${resolvedAlternative.price.toLocaleString('en-IN')}` : 'standard pricing';
         const stockDisplay = resolvedAlternative.stock !== undefined ? `${resolvedAlternative.stock} units in stock` : 'in stock';
@@ -1080,34 +1460,34 @@ Sub-Intent: ${subIntent || 'GENERAL'}`;
           const categoryTerm = resolvedAlternative.category ? resolvedAlternative.category.toLowerCase().replace(/s$/, '') : 'product';
           responseText = `Your other ${categoryTerm} in the catalog is ${resolvedAlternative.name} (${priceDisplay}, ${stockDisplay}). It has an established upsell relationship to your ${state.lastProduct?.name || 'Pro Carbon Running Shoes'} (+₹${upsellRelation.diff}), offering customers a clear upgrade path.`;
         } else {
-          responseText = `Your other product is ${resolvedAlternative.name} in ${resolvedAlternative.category || 'the catalog'} (${priceDisplay}, ${stockDisplay}). It serves as a viable alternative for customers browsing this line.`;
+          responseText = LOCALIZED_MERCHANT_STRINGS.alternativeProduct(resolvedAlternative.name, resolvedAlternative.category || 'the catalog', priceDisplay, stockDisplay, language);
         }
       } else if (subIntent === 'BEST_OPPORTUNITY') {
         if (bestOpportunity) {
           const priceDisplay = bestOpportunity.price !== undefined ? `₹${bestOpportunity.price.toLocaleString('en-IN')}` : 'competitive pricing';
           const stockDisplay = bestOpportunity.stock !== undefined ? `${bestOpportunity.stock} in stock` : 'healthy inventory';
-          responseText = `Your best opportunity right now is ${bestOpportunity.name} in ${bestOpportunity.category || 'your catalog'} (${priceDisplay}, ${stockDisplay}). ${bestOpportunity.reason || 'It combines strong inventory depth with healthy margins for maximum revenue velocity.'}`;
+          responseText = LOCALIZED_MERCHANT_STRINGS.bestOpportunity(bestOpportunity.name, bestOpportunity.category || 'your catalog', priceDisplay, stockDisplay, bestOpportunity.reason, language);
         } else {
           responseText = `Based on current catalog demand, your inventory is well-balanced across active categories.`;
         }
       } else if (subIntent === 'FOLLOW_UP_REASON') {
         const explained = state.lastProduct || topOpportunity;
         if (explained) {
-          responseText = `${explained.name} is recommended because of its solid stock level (${explained.stock !== undefined ? `${explained.stock} units` : 'healthy volume'}) in ${explained.category || 'the catalog'} at ₹${explained.price?.toLocaleString('en-IN') || 'standard price'}, ensuring you can fulfill customer demand while maintaining sound profit margins.`;
+          responseText = LOCALIZED_MERCHANT_STRINGS.followUpReason(explained.name, explained.stock, explained.category || 'the catalog', explained.price, language);
         } else {
           responseText = `This recommendation is based on inventory depth, pricing tiers, and profit margins across your active store catalog.`;
         }
       } else if (subIntent === 'CATEGORY_PROMOTION' && categoryOpportunity) {
-        responseText = `For your ${categoryOpportunity.category} collection, your ${categoryOpportunity.name} is the prime candidate for promotion (${categoryOpportunity.reason || 'High stock with healthy margin'}).`;
+        responseText = LOCALIZED_MERCHANT_STRINGS.categoryPromotion(categoryOpportunity.category, categoryOpportunity.name, categoryOpportunity.reason, language);
       } else if (intent === 'CROSS_SELL_OPPORTUNITY' || subIntent === 'CROSS_SELL') {
         if (topCrossSell) {
-          responseText = `We recommend pairing ${topCrossSell.name} with ${topCrossSell.relatedName} as a complementary bundle.`;
+          responseText = `Recommended Cross-Sell Pairing:\n• Primary Product: ${topCrossSell.name}\n• Complementary Pairing: ${topCrossSell.relatedName}\n• Strategy: High-margin pairing boosts average order value (AOV) and moves inventory faster.`;
         } else {
           responseText = `To enable cross-selling bundles, consider adding complementary accessories or related items to your catalog.`;
         }
       } else if (intent === 'UPSELL_OPPORTUNITY' || subIntent === 'UPSELL') {
         if (topUpsell) {
-          responseText = `Consider offering ${topUpsell.premiumName} as a premium alternative when customers view ${topUpsell.name} (₹${topUpsell.priceDiff} difference).`;
+          responseText = `Recommended Premium Upsell:\n• Base Product: ${topUpsell.name}\n• Premium Upgrade: ${topUpsell.premiumName} (+₹${topUpsell.priceDiff} difference)\n• Strategy: Gives customers a clear upgrade path, maximizing profit per order.`;
         } else {
           responseText = `To maximize revenue through upselling, consider adding higher-tier premium options in your key categories.`;
         }

@@ -50,6 +50,32 @@ describe('AI Agent & Intent Detection Engine', () => {
       expect(req2.maxPrice).toBe(3000);
     });
 
+    it('correctly interprets 1 lakh as 100000 across multiple variations', () => {
+      const r1 = IntentService.extractRequirements('a laptop under 1 lakh');
+      expect(r1.category).toBe('Laptops');
+      expect(r1.maxPrice).toBe(100000);
+
+      const r2 = IntentService.extractRequirements('laptop under 1.5 lakh');
+      expect(r2.category).toBe('Laptops');
+      expect(r2.maxPrice).toBe(150000);
+
+      const r3 = IntentService.extractRequirements('laptop under 1 lac');
+      expect(r3.maxPrice).toBe(100000);
+
+      const r4 = IntentService.extractRequirements('laptop between 50k and 1 lakh');
+      expect(r4.minPrice).toBe(50000);
+      expect(r4.maxPrice).toBe(100000);
+
+      const r5 = IntentService.extractRequirements('laptop 1 lakh budget');
+      expect(r5.maxPrice).toBe(100000);
+
+      const r6 = IntentService.extractRequirements(
+        'a laptop under 1 lakh so some are not coming so i want this ai to under stand 1 lakh means 100000 like that'
+      );
+      expect(r6.category).toBe('Laptops');
+      expect(r6.maxPrice).toBe(100000);
+    });
+
     it('recognizes Romanized Kannada input (nanage running shoes beku under 3000)', () => {
       const res = IntentService.processMessage('nanage running shoes beku under 3000', 'buyer');
       expect(res.requirements.category).toBe('Shoes');

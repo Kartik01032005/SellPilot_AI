@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { X, Lock, Mail, Store, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface AuthModalProps {
@@ -11,6 +12,7 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const { login, register } = useAuth();
+  const { t } = useLanguage();
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [name, setName] = useState('');
@@ -110,16 +112,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                {isRegister ? 'Create Account' : 'Welcome Back'}
+                {isRegister ? t('auth.createAccount') : t('auth.welcomeBack')}
               </h2>
               <p className="text-xs text-slate-500">
-                {isRegister ? 'Join SellPilot AI Platform' : 'Sign in to access your commerce account'}
+                {isRegister ? t('auth.registerSubtitle') : t('auth.loginSubtitle')}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -128,21 +130,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Demo Fill Switchers */}
         <div className="p-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Quick Fill:</span>
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('auth.demoHeading')}:</span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => handleDemoFill('customer')}
               className="px-3 py-1 rounded-full text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-colors flex items-center gap-1.5"
             >
-              <User className="w-3.5 h-3.5 text-brand-600" /> Buyer
+              <User className="w-3.5 h-3.5 text-brand-600" /> {t('auth.demoCustomerBtn')}
             </button>
             <button
               type="button"
               onClick={() => handleDemoFill('merchant')}
               className="px-3 py-1 rounded-full text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-colors flex items-center gap-1.5"
             >
-              <Store className="w-3.5 h-3.5 text-brand-600" /> Merchant
+              <Store className="w-3.5 h-3.5 text-brand-600" /> {t('auth.demoMerchantBtn')}
             </button>
           </div>
         </div>
@@ -159,7 +161,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <>
               {/* Role Toggle */}
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Account Role</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">{t('auth.roleLabel')}</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
                   <button
                     type="button"
@@ -171,7 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     }`}
                   >
                     <User className="w-3.5 h-3.5 text-brand-600" />
-                    <span>Customer</span>
+                    <span>{t('auth.customerRole')}</span>
                   </button>
                   <button
                     type="button"
@@ -183,13 +185,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     }`}
                   >
                     <Store className="w-3.5 h-3.5 text-brand-600" />
-                    <span>Merchant</span>
+                    <span>{t('auth.merchantRole')}</span>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Full Name</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">{t('auth.nameLabel')}</label>
                 <input
                   type="text"
                   required
@@ -202,7 +204,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               {role === 'merchant' && (
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Business / Store Name</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">{t('auth.businessNameLabel')}</label>
                   <input
                     type="text"
                     value={businessName}
@@ -216,7 +218,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           )}
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1">{t('auth.emailLabel')}</label>
             <div className="relative flex items-center">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
@@ -231,7 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1">{t('auth.passwordLabel')}</label>
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
@@ -250,7 +252,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             disabled={loading}
             className="w-full py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-95 mt-2"
           >
-            <span>{loading ? 'Authenticating...' : isRegister ? 'Create Account' : 'Sign In'}</span>
+            <span>{loading ? t('common.loading') : isRegister ? t('auth.signUpBtn') : t('auth.signInBtn')}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
@@ -259,7 +261,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-center text-xs text-slate-500">
           {isRegister ? (
             <span>
-              Already have an account?{' '}
+              {t('auth.haveAccountPrompt')}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -268,12 +270,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 }}
                 className="font-bold text-slate-900 hover:underline"
               >
-                Sign In
+                {t('auth.signInBtn')}
               </button>
             </span>
           ) : (
             <span>
-              Don&apos;t have an account?{' '}
+              {t('auth.noAccountPrompt')}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -282,7 +284,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 }}
                 className="font-bold text-slate-900 hover:underline"
               >
-                Create Account
+                {t('auth.signUpBtn')}
               </button>
             </span>
           )}

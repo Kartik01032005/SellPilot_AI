@@ -71,17 +71,52 @@ export interface IntentResult {
 }
 
 export class IntentService {
-  private static parsePriceValue(valStr: string): number {
-    const clean = valStr.toLowerCase().trim();
-    if (clean.endsWith('k')) {
-      const num = parseFloat(clean.replace('k', ''));
-      return num * 1000;
+  public static parsePriceValue(valStr: string): number {
+    if (!valStr) return 0;
+    let clean = valStr.toLowerCase().replace(/,/g, '').trim();
+
+    // Map word prefixes e.g. "a", "one", "two", "half"
+    if (/^(?:a|one)\s+/i.test(clean)) {
+      clean = clean.replace(/^(?:a|one)\s+/i, '1 ');
+    } else if (/^two\s+/i.test(clean)) {
+      clean = clean.replace(/^two\s+/i, '2 ');
+    } else if (/^three\s+/i.test(clean)) {
+      clean = clean.replace(/^three\s+/i, '3 ');
+    } else if (/^four\s+/i.test(clean)) {
+      clean = clean.replace(/^four\s+/i, '4 ');
+    } else if (/^five\s+/i.test(clean)) {
+      clean = clean.replace(/^five\s+/i, '5 ');
+    } else if (/^half\s*(?:a)?\s*/i.test(clean)) {
+      clean = clean.replace(/^half\s*(?:a)?\s*/i, '0.5 ');
+    } else if (/^(?:a\s+)?(?:lakh|lac)\b/i.test(clean)) {
+      clean = '1 ' + clean;
     }
-    if (clean.endsWith('l') || clean.endsWith('lakh')) {
-      const num = parseFloat(clean.replace(/lakh|l/g, ''));
-      return num * 100000;
+
+    // Crore multiplier (1 crore = 10,000,000)
+    if (/\b(?:cr|crore|crores)\b/i.test(clean) || clean.endsWith('cr')) {
+      const match = clean.match(/(\d+(?:\.\d+)?)/);
+      const num = match ? parseFloat(match[1]) : 0;
+      return isNaN(num) ? 0 : Math.round(num * 10000000);
     }
-    return parseFloat(clean.replace(/[^0-9.]/g, '')) || 0;
+
+    // Lakh / Lac multiplier (1 lakh = 100,000)
+    if (/\b(?:lakh|lakhs|lac|lacs)\b/i.test(clean) || /(?:\d+(?:\.\d+)?)\s*l\b/i.test(clean)) {
+      const match = clean.match(/(\d+(?:\.\d+)?)/);
+      const num = match ? parseFloat(match[1]) : 0;
+      return isNaN(num) ? 0 : Math.round(num * 100000);
+    }
+
+    // Thousand / K multiplier (1 thousand = 1,000)
+    if (/\b(?:k|kilo|thousand|thousands|hazar|hazaar|saavira|aayiram|vela)\b/i.test(clean) || clean.endsWith('k')) {
+      const match = clean.match(/(\d+(?:\.\d+)?)/);
+      const num = match ? parseFloat(match[1]) : 0;
+      return isNaN(num) ? 0 : Math.round(num * 1000);
+    }
+
+    // Pure number (e.g. "100000", "50000", "2999")
+    const match = clean.match(/(\d+(?:\.\d+)?)/);
+    const num = match ? parseFloat(match[1]) : 0;
+    return isNaN(num) ? 0 : Math.round(num);
   }
 
   public static extractRequirements(message: string): ExtractedRequirements {
@@ -93,14 +128,14 @@ export class IntentService {
       detectedLanguage: 'en',
     };
 
-    // Detect language / Romanized hints
-    if (/\b(nanage|beku|kodi|yaavudu|yavudhu|thorsu)\b/i.test(text)) {
+    // Detect language / Romanized hints & native scripts
+    if (/[\u0C80-\u0CFF]|\b(nanage|beku|kodi|yaavudu|yavudhu|thorsu)\b/i.test(text)) {
       requirements.detectedLanguage = 'kn'; // Kannada
-    } else if (/\b(mujhe|chahiye|kya|kaunsa|sasta|batao|karo|bhejo)\b/i.test(text)) {
+    } else if (/[\u0900-\u097F]|\b(mujhe|chahiye|kya|kaunsa|sasta|batao|karo|bhejo)\b/i.test(text)) {
       requirements.detectedLanguage = 'hi'; // Hindi
-    } else if (/\b(enakku|venum|kudu|edhu)\b/i.test(text)) {
+    } else if (/[\u0B80-\u0BFF]|\b(enakku|venum|kudu|edhu)\b/i.test(text)) {
       requirements.detectedLanguage = 'ta'; // Tamil
-    } else if (/\b(naaku|kavali|ivvandi|edi)\b/i.test(text)) {
+    } else if (/[\u0C00-\u0C7F]|\b(naaku|kavali|ivvandi|edi)\b/i.test(text)) {
       requirements.detectedLanguage = 'te'; // Telugu
     }
 
@@ -115,37 +150,108 @@ export class IntentService {
       requirements.targetOrdinal = 4;
     }
 
-    // Quantity extraction: "2 shoes", "quantity 3", "x2"
+    // Quantity extraction: "2 shoes", "quantity 3", "x2" (avoid extracting price components as quantity)
     const qtyMatch = text.match(/\b(?:quantity|qty|count|buy|add)?\s*(\d+)\s*(?:items|units|pcs|pieces|pairs)?\b/i);
-    if (qtyMatch && qtyMatch[1] && !text.includes('under') && !text.includes('rs') && !text.includes('₹')) {
-      const parsedQty = parseInt(qtyMatch[1], 10);
-      if (parsedQty > 0 && parsedQty <= 50) {
-        requirements.quantity = parsedQty;
+    if (
+      qtyMatch &&
+      qtyMatch[1] &&
+      !text.includes('under') &&
+      !text.includes('rs') &&
+      !text.includes('₹') &&
+      !text.includes('lakh') &&
+      !text.includes('lac') &&
+      !text.includes('thousand') &&
+      !text.includes('crore')
+    ) {
+      const isPriceToken = new RegExp(`\\b${qtyMatch[1]}\\s*(?:lakh|lac|k|thousand|cr|crore)\\b`, 'i').test(text);
+      if (!isPriceToken) {
+        const parsedQty = parseInt(qtyMatch[1], 10);
+        if (parsedQty > 0 && parsedQty <= 50) {
+          requirements.quantity = parsedQty;
+        }
       }
     }
 
-    // Price extraction: "under 3000", "under 3k", "below 50000", "< 500", "upto 2500"
-    const underMatch = text.match(/(?:under|below|less than|upto|within|max|<=)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?k|\d+)/i);
+    // Comprehensive price pattern supporting:
+    // "1 lakh", "1.5 lakh", "1lakh", "1 lac", "1lac", "2 lakhs", "1l", "1.5l"
+    // "50k", "50 thousand", "1,00,000", "100000", "1 crore", "1cr"
+    const PRICE_TOKEN_REGEX =
+      '(?:\\d+(?:,\\d+)*(?:\\.\\d+)?\\s*(?:lakhs?|lacs?|crores?|cr|thousands?|hazar|hazaar|saavira|aayiram|vela|k|l)\\b|\\d+(?:,\\d+)*(?:\\.\\d+)?|(?:a|one|two|three|four|five|half(?:\\s+a)?)\\s+(?:lakhs?|lacs?|crores?|cr|thousands?|k)\\b|(?:a\\s+)?(?:lakhs?|lacs?)\\b)';
+
+    // Price extraction: "under 3000", "under 1 lakh", "below 50000", "upto 1.5 lakh", "within 1 lakh"
+    const underRegex = new RegExp(
+      `(?:under|below|less than|upto|up to|within|max|<=|<|budget\\s*(?:of|is|:)?|around|about|priced at|at most)\\s*(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})`,
+      'i'
+    );
+    const underMatch = text.match(underRegex);
     if (underMatch && underMatch[1]) {
       requirements.maxPrice = this.parsePriceValue(underMatch[1]);
     } else {
-      const directUnder = text.match(/under\s+(\d+k|\d+)/i);
-      if (directUnder && directUnder[1]) {
-        requirements.maxPrice = this.parsePriceValue(directUnder[1]);
+      // Post-position patterns: "1 lakh budget", "1 lakh ke andar", "1 lakh tak", "1 lakh olage", "1 lakh kulla"
+      const postUnderRegex = new RegExp(
+        `(${PRICE_TOKEN_REGEX})\\s*(?:₹|rs\\.?|inr)?\\s*(?:budget|ke andar|tak|olage|varage|kulla|lopala|me|mein)\\b`,
+        'i'
+      );
+      const postMatch = text.match(postUnderRegex);
+      if (postMatch && postMatch[1]) {
+        requirements.maxPrice = this.parsePriceValue(postMatch[1]);
+      } else {
+        const directUnder = text.match(new RegExp(`under\\s+(${PRICE_TOKEN_REGEX})`, 'i'));
+        if (directUnder && directUnder[1]) {
+          requirements.maxPrice = this.parsePriceValue(directUnder[1]);
+        }
       }
     }
 
-    // Min price extraction: "above 2000", "min 1000", "> 500"
-    const minMatch = text.match(/(?:above|more than|min|at least|>=?)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?k|\d+)/i);
+    // Min price extraction: "above 2000", "min 1000", "above 50k", "> 500", "starting from 1 lakh"
+    const minRegex = new RegExp(
+      `(?:above|more than|min|at least|>=?|>|starting from|starts at)\\s*(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})`,
+      'i'
+    );
+    const minMatch = text.match(minRegex);
     if (minMatch && minMatch[1]) {
       requirements.minPrice = this.parsePriceValue(minMatch[1]);
+    } else {
+      const postMinRegex = new RegExp(
+        `(${PRICE_TOKEN_REGEX})\\s*(?:₹|rs\\.?|inr)?\\s*(?:se upar|se jyada|se adhik|mele|hecchu|mela|adhigam|ekkuva|paina)\\b`,
+        'i'
+      );
+      const postMinMatch = text.match(postMinRegex);
+      if (postMinMatch && postMinMatch[1]) {
+        requirements.minPrice = this.parsePriceValue(postMinMatch[1]);
+      }
     }
 
-    // Range: "between 2000 and 5000"
-    const rangeMatch = text.match(/between\s*(?:₹|rs\.?|inr)?\s*(\d+k|\d+)\s*(?:and|to|-)\s*(?:₹|rs\.?|inr)?\s*(\d+k|\d+)/i);
+    // Range: "between 50k and 1 lakh", "between 2000 and 5000", "40000 to 100000"
+    const rangeRegex = new RegExp(
+      `between\\s*(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})\\s*(?:and|to|-)\\s*(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})`,
+      'i'
+    );
+    const rangeMatch = text.match(rangeRegex);
     if (rangeMatch && rangeMatch[1] && rangeMatch[2]) {
       requirements.minPrice = this.parsePriceValue(rangeMatch[1]);
       requirements.maxPrice = this.parsePriceValue(rangeMatch[2]);
+    } else {
+      const directRange = text.match(
+        new RegExp(
+          `(?:from\\s*)?(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})\\s*(?:to|-)\\s*(?:₹|rs\\.?|inr)?\\s*(${PRICE_TOKEN_REGEX})\\s*(?:budget|range)?`,
+          'i'
+        )
+      );
+      if (directRange && directRange[1] && directRange[2]) {
+        const p1 = this.parsePriceValue(directRange[1]);
+        const p2 = this.parsePriceValue(directRange[2]);
+        if (p1 > 0 && p2 > 0) {
+          requirements.minPrice = Math.min(p1, p2);
+          requirements.maxPrice = Math.max(p1, p2);
+        }
+      }
+    }
+
+    if (requirements.minPrice !== undefined && requirements.maxPrice !== undefined && requirements.minPrice > requirements.maxPrice) {
+      const temp = requirements.minPrice;
+      requirements.minPrice = requirements.maxPrice;
+      requirements.maxPrice = temp;
     }
 
     // Category extraction
@@ -306,8 +412,12 @@ export class IntentService {
       return 'PRODUCT_SEARCH';
     }
 
-    // General greetings / assistance
-    if (/\b(hello|hi|hey|help|assist|namaste|vanakkam|namaskara)\b/i.test(text)) {
+    // General greetings / assistance / currency meaning
+    if (
+      /\b(hello|hi|hey|help|assist|namaste|vanakkam|namaskara)\b/i.test(text) ||
+      /\b(?:1\s*lakh|one\s*lakh|lakh|crore)\s*(?:means|equals|meaning|matlab|kya hai)\b/i.test(text) ||
+      /\b(?:what is|how much is|what does)\s*(?:1\s*lakh|one\s*lakh|a lakh|lakh|a crore)\b/i.test(text)
+    ) {
       return 'GENERAL_ASSISTANCE';
     }
 

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '@/lib/api';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   Package,
   Clock,
@@ -60,6 +61,7 @@ interface OrderRecord {
 }
 
 export const CustomerOrders: React.FC = () => {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,10 +120,10 @@ export const CustomerOrders: React.FC = () => {
         }
         setCancellingOrder(null);
       } else {
-        setCancelError(res.message || 'Failed to cancel order');
+        setCancelError(res.message || t('orders.cancellationFailed'));
       }
     } catch (err) {
-      setCancelError(err instanceof Error ? err.message : 'Error cancelling order');
+      setCancelError(err instanceof Error ? err.message : t('orders.cancellationFailed'));
     } finally {
       setCancelling(false);
     }
@@ -132,44 +134,44 @@ export const CustomerOrders: React.FC = () => {
       case 'paid':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid & Verified
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {t('orders.statusPaid')}
           </span>
         );
       case 'processing':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 shadow-2xs">
-            <Truck className="w-3.5 h-3.5 text-blue-600" /> Processing
+            <Truck className="w-3.5 h-3.5 text-blue-600" /> {t('orders.statusProcessing')}
           </span>
         );
       case 'completed':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {t('orders.statusCompleted')}
           </span>
         );
       case 'cancelled':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1.5 shadow-2xs">
-            <Ban className="w-3.5 h-3.5 text-rose-600" /> Cancelled
+            <Ban className="w-3.5 h-3.5 text-rose-600" /> {t('orders.statusCancelled')}
           </span>
         );
       case 'failed':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1.5 shadow-2xs">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Payment Failed
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> {t('orders.statusFailed')}
           </span>
         );
       case 'payment_pending':
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5 shadow-2xs">
-            <Clock className="w-3.5 h-3.5 text-amber-600" /> Payment Pending
+            <Clock className="w-3.5 h-3.5 text-amber-600" /> {t('orders.statusPending')}
           </span>
         );
       case 'pending':
       default:
         return (
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-            <Clock className="w-3.5 h-3.5 text-slate-500" /> Created
+            <Clock className="w-3.5 h-3.5 text-slate-500" /> {t('orders.statusPending')}
           </span>
         );
     }
@@ -192,8 +194,8 @@ export const CustomerOrders: React.FC = () => {
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Your Order History</h2>
-          <p className="text-xs text-slate-500 font-medium">Production-grade lifecycle management with verified Razorpay payment receipts.</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('orders.title')}</h2>
+          <p className="text-xs text-slate-500 font-medium">{t('orders.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Status Filter Chips */}
@@ -208,7 +210,7 @@ export const CustomerOrders: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {tab}
+                {tab === 'all' ? t('catalog.categoryAll') : tab === 'paid' ? t('orders.statusPaid') : tab === 'pending' ? t('orders.statusPending') : t('orders.statusCancelled')}
               </button>
             ))}
           </div>
@@ -228,7 +230,7 @@ export const CustomerOrders: React.FC = () => {
       {loading ? (
         <div className="p-12 text-center text-slate-500 space-y-3 bg-white rounded-3xl border border-slate-200 shadow-soft">
           <RefreshCw className="w-8 h-8 animate-spin mx-auto text-brand-600" />
-          <p className="text-xs font-bold">Loading verified orders...</p>
+          <p className="text-xs font-bold">{t('common.loading')}</p>
         </div>
       ) : error ? (
         <div className="p-6 rounded-3xl bg-rose-50 border border-rose-200 text-center">
@@ -238,9 +240,9 @@ export const CustomerOrders: React.FC = () => {
       ) : filteredOrders.length === 0 ? (
         <div className="p-12 rounded-3xl bg-white border border-slate-200 text-center space-y-3 shadow-soft">
           <Package className="w-12 h-12 stroke-[1.5] text-slate-300 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-700">No orders matching this filter</h3>
+          <h3 className="text-sm font-bold text-slate-700">{t('orders.noOrdersTitle')}</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto font-medium">
-            Discover verified products through AI discovery or add items to your cart.
+            {t('orders.noOrdersSubtitle')}
           </p>
         </div>
       ) : (
@@ -257,7 +259,7 @@ export const CustomerOrders: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                      Order Reference
+                      {t('orders.orderNumber')}
                     </span>
                     <span className="text-xs font-mono font-bold text-slate-900">
                       {ord.orderNumber || ord._id}
@@ -300,7 +302,7 @@ export const CustomerOrders: React.FC = () => {
                   </span>
                   {ord.status === 'paid' && (
                     <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Razorpay Verified
+                      <ShieldCheck className="w-3.5 h-3.5" /> {t('productModal.razorpayTestReady')}
                     </span>
                   )}
                 </div>
@@ -310,7 +312,7 @@ export const CustomerOrders: React.FC = () => {
                     onClick={() => setSelectedOrder(ord)}
                     className="px-4 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors border border-slate-200"
                   >
-                    <Eye className="w-3.5 h-3.5" /> Details
+                    <Eye className="w-3.5 h-3.5" /> {t('orders.viewDetails')}
                   </button>
 
                   {isCancellable(ord.status) && (
@@ -318,7 +320,7 @@ export const CustomerOrders: React.FC = () => {
                       onClick={() => setCancellingOrder(ord)}
                       className="px-4 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1.5 transition-colors"
                     >
-                      <Ban className="w-3.5 h-3.5" /> Cancel
+                      <Ban className="w-3.5 h-3.5" /> {t('orders.cancelOrder')}
                     </button>
                   )}
                 </div>
@@ -339,12 +341,13 @@ export const CustomerOrders: React.FC = () => {
                   <Package className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Order Details</h3>
+                  <h3 className="text-base font-bold text-slate-900">{t('orders.viewDetails')}</h3>
                   <p className="text-xs font-mono text-slate-500 font-medium">{selectedOrder.orderNumber || selectedOrder._id}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
+                aria-label={t('common.close')}
                 className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -356,11 +359,11 @@ export const CustomerOrders: React.FC = () => {
               {/* Status Header Banner */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Current Status</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{t('common.status')}</span>
                   {getStatusBadge(selectedOrder.status)}
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Amount</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{t('orders.orderTotal')}</span>
                   <span className="text-base font-black text-slate-900">₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -368,7 +371,7 @@ export const CustomerOrders: React.FC = () => {
               {/* Items Breakdown */}
               <div>
                 <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-1.5 text-xs">
-                  <Layers className="w-3.5 h-3.5 text-brand-600" /> Items in Order
+                  <Layers className="w-3.5 h-3.5 text-brand-600" /> {t('orders.orderItems')}
                 </h4>
                 <div className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                   {selectedOrder.items.map((it, idx) => (
@@ -388,17 +391,17 @@ export const CustomerOrders: React.FC = () => {
               {/* Price Details */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="flex justify-between text-slate-500 font-medium">
-                  <span>Subtotal</span>
+                  <span>{t('cart.subtotal')}</span>
                   <span className="font-bold text-slate-800">₹{(selectedOrder.subtotal ?? selectedOrder.totalAmount).toLocaleString('en-IN')}</span>
                 </div>
                 {selectedOrder.discount && selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-emerald-700 font-bold">
-                    <span>Campaign Discount</span>
+                    <span>{t('cart.discount')}</span>
                     <span>-₹{selectedOrder.discount.toLocaleString('en-IN')}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-                  <span>Final Total</span>
+                  <span>{t('orders.orderTotal')}</span>
                   <span className="text-brand-600 font-black text-sm">₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -407,7 +410,7 @@ export const CustomerOrders: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <h5 className="font-bold text-slate-900 flex items-center gap-1.5 text-[11px]">
-                    <MapPin className="w-3.5 h-3.5 text-brand-600" /> Shipping Destination
+                    <MapPin className="w-3.5 h-3.5 text-brand-600" /> {t('orders.shippingTo')}
                   </h5>
                   <p className="text-slate-500 text-[11px] font-medium">
                     {selectedOrder.shippingAddress?.street || '123 Tech Street'}<br />
@@ -417,10 +420,10 @@ export const CustomerOrders: React.FC = () => {
 
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <h5 className="font-bold text-slate-900 flex items-center gap-1.5 text-[11px]">
-                    <CreditCard className="w-3.5 h-3.5 text-brand-600" /> Payment & Security
+                    <CreditCard className="w-3.5 h-3.5 text-brand-600" /> {t('checkout.paymentMethod')}
                   </h5>
                   <p className="text-slate-500 text-[11px] font-medium">
-                    Mode: Razorpay Test Mode<br />
+                    {t('checkout.razorpayOption')}<br />
                     {selectedOrder.razorpayPaymentId ? (
                       <span className="font-mono text-[10px] text-emerald-700 font-bold">ID: {selectedOrder.razorpayPaymentId}</span>
                     ) : (
@@ -434,7 +437,7 @@ export const CustomerOrders: React.FC = () => {
               {selectedOrder.statusHistory && selectedOrder.statusHistory.length > 0 && (
                 <div>
                   <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-1.5 text-xs">
-                    <Clock className="w-3.5 h-3.5 text-brand-600" /> Lifecycle History
+                    <Clock className="w-3.5 h-3.5 text-brand-600" /> {t('orders.statusHistory')}
                   </h4>
                   <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
                     {selectedOrder.statusHistory.map((hist, idx) => (
@@ -461,14 +464,14 @@ export const CustomerOrders: React.FC = () => {
                   }}
                   className="px-4 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition-colors"
                 >
-                  Cancel This Order
+                  {t('orders.cancelOrder')}
                 </button>
               )}
               <button
                 onClick={() => setSelectedOrder(null)}
                 className="ml-auto px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors"
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -484,25 +487,25 @@ export const CustomerOrders: React.FC = () => {
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Cancel Order</h3>
+                <h3 className="text-base font-bold text-slate-900">{t('orders.cancelOrder')}</h3>
                 <p className="text-xs font-mono text-slate-500 font-medium">{cancellingOrder.orderNumber || cancellingOrder._id}</p>
               </div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
               <p className="text-slate-700 font-medium">
-                Are you sure you want to cancel this order?
+                {t('orders.cancelConfirm')}
               </p>
               {(cancellingOrder.status === 'paid' || cancellingOrder.status === 'processing') && (
                 <p className="text-emerald-700 text-[11px] font-bold flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  All purchased product stock will be automatically restocked into the store catalog.
+                  {t('orders.restockedNote')}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">Cancellation Reason</label>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason</label>
               <select
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
@@ -528,7 +531,7 @@ export const CustomerOrders: React.FC = () => {
                 disabled={cancelling}
                 className="flex-1 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
               >
-                Keep Order
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -539,10 +542,10 @@ export const CustomerOrders: React.FC = () => {
                 {cancelling ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Cancelling...</span>
+                    <span>{t('common.loading')}</span>
                   </>
                 ) : (
-                  <span>Confirm Cancel</span>
+                  <span>{t('orders.cancelOrder')}</span>
                 )}
               </button>
             </div>

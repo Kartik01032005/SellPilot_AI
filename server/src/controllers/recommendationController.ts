@@ -25,7 +25,7 @@ export class RecommendationController {
 
   public static async getUpsell(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { productId } = req.body;
+      const productId = req.body?.productId || (req.query?.productId as string);
       if (!productId) {
         throw new CustomError('productId is required', 400, 'INVALID_REQUEST');
       }
@@ -43,7 +43,7 @@ export class RecommendationController {
 
   public static async getCrossSell(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { productId } = req.body;
+      const productId = req.body?.productId || (req.query?.productId as string);
       if (!productId) {
         throw new CustomError('productId is required', 400, 'INVALID_REQUEST');
       }
@@ -54,6 +54,26 @@ export class RecommendationController {
         success: true,
         count: recommendations.length,
         recommendations,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async getProductRecommendations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const productId = req.params?.productId || req.body?.productId || (req.query?.productId as string);
+      if (!productId) {
+        throw new CustomError('productId is required', 400, 'INVALID_REQUEST');
+      }
+
+      const { upsell, crossSells } = await RecommendationService.getProductRecommendations(productId);
+
+      res.status(200).json({
+        success: true,
+        productId,
+        upsell,
+        crossSells,
       });
     } catch (error) {
       next(error);

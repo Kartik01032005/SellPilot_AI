@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { useCart } from '@/context/CartContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { ApiClient } from '@/lib/api';
 import {
   X,
@@ -51,6 +52,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   correlationId,
 }) => {
   const { items, preparedCheckout, clearCart } = useCart();
+  const { t } = useLanguage();
 
   const [step, setStep] = useState<'confirm' | 'processing' | 'success' | 'failed'>('confirm');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -159,34 +161,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }>('/api/payment/verify', {
           method: 'POST',
           body: JSON.stringify({
+            orderId: backendOrder._id,
             razorpayOrderId: response.razorpay_order_id,
             razorpayPaymentId: response.razorpay_payment_id,
             razorpaySignature: response.razorpay_signature,
+            correlationId,
           }),
         });
 
-        if (!verifyRes.success || !verifyRes.verified) {
-          throw new Error(verifyRes.message || 'Payment verification failed');
+        if (verifyRes.success && verifyRes.verified) {
+          setCompletedOrder({ ...backendOrder, status: 'paid' });
+          clearCart();
+          setStep('success');
+          onOrderSuccess(backendOrder._id);
+        } else {
+          setStep('failed');
+          setErrorMessage(verifyRes.message || 'Payment verification failed');
         }
-
-        setCompletedOrder({
-          id: backendOrder._id,
-          orderNumber: backendOrder.orderNumber,
-          amount: totalAmount,
-          status: 'paid',
-          correlationId: backendOrder.correlationId,
-        });
-        clearCart();
-        idempotencyKeyRef.current = null;
-        idempotencyFingerprintRef.current = null;
-        setStep('success');
-        onOrderSuccess(backendOrder._id);
       };
 
       const cancelPayment = () => {
         void ApiClient.request('/api/payment/cancel', {
           method: 'POST',
-          body: JSON.stringify({ orderId: backendOrder._id }),
+          body: JSON.stringify({
+            orderId: backendOrder._id,
+            reason: 'Checkout modal dismissed before payment completion',
+            correlationId,
+          }),
         });
       };
 
@@ -194,8 +195,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         void ApiClient.request('/api/payment/failure', {
           method: 'POST',
           body: JSON.stringify({
-            razorpayOrderId: paymentOrderRes.razorpayOrderId,
-            reason,
+            orderId: backendOrder._id,
+            reason: reason || 'Payment failed during checkout',
+            correlationId,
           }),
         });
       };
@@ -251,14 +253,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Razorpay Secure Checkout</h2>
-              <p className="text-xs text-slate-500 font-medium">Razorpay Test Mode · Demo Payment</p>
+              <h2 className="text-base font-bold text-slate-900">{t('checkout.title')}</h2>
+              <p className="text-xs text-slate-500 font-medium">{t('checkout.razorpayDesc')}</p>
             </div>
           </div>
           {step !== 'processing' && (
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('common.close')}
               className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -271,7 +273,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="p-6 space-y-5">
             <div>
               <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Order Summary
+                {t('checkout.orderSummary')}
               </h3>
               <div className="max-h-44 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
                 {items.map((it) => (
@@ -290,17 +292,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {/* Price Details */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
               <div className="flex justify-between text-xs text-slate-500 font-medium">
-                <span>Subtotal</span>
+                <span>{t('cart.subtotal')}</span>
                 <span className="font-semibold text-slate-800">₹{(preparedCheckout?.subtotal ?? totalAmount).toLocaleString('en-IN')}</span>
               </div>
               {preparedCheckout && preparedCheckout.discount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-700 font-semibold">
-                  <span>Campaign Discount</span>
+                  <span>{t('cart.discount')}</span>
                   <span>-₹{preparedCheckout.discount.toLocaleString('en-IN')}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-                <span>Total Amount to Pay</span>
+                <span>{t('cart.total')}</span>
                 <span className="text-base text-brand-600 font-black">
                   ₹{totalAmount.toLocaleString('en-IN')}
                 </span>
@@ -311,8 +313,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-3.5 rounded-2xl bg-brand-50/80 border border-brand-200/60 flex items-start space-x-2.5 text-xs text-slate-700 font-medium">
               <ShieldCheck className="w-4 h-4 text-brand-600 shrink-0 mt-0.5" />
               <span>
-                Your total is <strong className="text-slate-900 font-bold">₹{totalAmount.toLocaleString('en-IN')}</strong>. 
-                Ready to execute verified Razorpay Test Mode checkout?
+                {t('cart.total')}: <strong className="text-slate-900 font-bold">₹{totalAmount.toLocaleString('en-IN')}</strong>. 
+                {t('checkout.razorpayOption')}
               </span>
             </div>
 
@@ -323,14 +325,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 onClick={onClose}
                 className="flex-1 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmAndPay}
                 className="flex-1 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm hover:shadow-md flex items-center justify-center space-x-1.5 transition-all active:scale-95"
               >
-                <span>Yes, Proceed to Pay</span>
+                <span>{t('checkout.payBtn')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -341,9 +343,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {step === 'processing' && (
           <div className="p-12 flex flex-col items-center justify-center text-center space-y-4">
             <RefreshCw className="w-10 h-10 text-brand-600 animate-spin" />
-            <h3 className="text-base font-bold text-slate-900">Verifying Transaction with Backend...</h3>
+            <h3 className="text-base font-bold text-slate-900">{t('checkout.processing')}</h3>
             <p className="text-xs text-slate-500 max-w-xs font-medium">
-              Communicating with Razorpay Test Mode & performing cryptographic signature verification.
+              {t('checkout.razorpayDesc')}
             </p>
           </div>
         )}
@@ -354,13 +356,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-2xs">
               <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Payment Verified & Order Confirmed!</h3>
+            <h3 className="text-lg font-bold text-slate-900">{t('checkout.successTitle')}</h3>
             <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium">
-              Your payment was verified by the server backend. Inventory has been updated atomically.
+              {t('checkout.successDesc')}
             </p>
             {completedOrder && (
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700">
-                Order Reference: <strong className="text-slate-900 font-mono">{completedOrder.orderNumber || completedOrder.id}</strong>
+                {t('orders.orderNumber')}: <strong className="text-slate-900 font-mono">{completedOrder.orderNumber || completedOrder.id}</strong>
                 {completedOrder.correlationId && (
                   <span className="block mt-1 text-slate-500">Trace ID: <strong className="font-mono text-slate-700">{completedOrder.correlationId}</strong></span>
                 )}
@@ -370,7 +372,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               onClick={onClose}
               className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
             >
-              Continue Shopping
+              {t('checkout.viewOrdersBtn')}
             </button>
           </div>
         )}
@@ -381,22 +383,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto">
               <AlertCircle className="w-7 h-7" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Payment Could Not Be Completed</h3>
+            <h3 className="text-base font-bold text-slate-900">{t('checkout.failureTitle')}</h3>
             <p className="text-xs text-rose-600 max-w-xs mx-auto font-medium">
-              {errorMessage || "The payment wasn't completed. You can try again from checkout."}
+              {errorMessage || t('checkout.failureDesc')}
             </p>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
                 className="flex-1 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
               >
-                Close
+                {t('checkout.closeBtn')}
               </button>
               <button
                 onClick={() => setStep('confirm')}
                 className="flex-1 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
               >
-                Retry
+                {t('checkout.tryAgainBtn')}
               </button>
             </div>
           </div>

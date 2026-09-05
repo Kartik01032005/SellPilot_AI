@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useCart } from '@/context/CartContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { ShoppingCart, Sparkles, Check, AlertTriangle } from 'lucide-react';
 
 export interface ProductItem {
@@ -29,6 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAskAI,
 }) => {
   const { addItem, items } = useCart();
+  const { t } = useLanguage();
   const inCart = items.some((it) => it.productId === product._id);
   const isOutOfStock = product.stock <= 0;
 
@@ -63,11 +65,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           >
             {isOutOfStock ? (
               <>
-                <AlertTriangle className="w-3 h-3 text-rose-600" /> Out of stock
+                <AlertTriangle className="w-3 h-3 text-rose-600" /> {t('catalog.outOfStock')}
               </>
             ) : (
               <>
-                <Check className="w-3 h-3 text-emerald-600" /> {product.stock} in stock
+                <Check className="w-3 h-3 text-emerald-600" /> {t('catalog.unitsStock', { count: product.stock })}
               </>
             )}
           </span>
@@ -106,7 +108,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Bottom Row (Price & Actions) */}
       <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">Price</span>
+          <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
+            {t('merchant.productTableColPrice')}
+          </span>
           <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
@@ -119,7 +123,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               e.stopPropagation();
               onAskAI(product);
             }}
-            title="Ask AI about this product"
+            title={t('productModal.askAboutProduct')}
             className="p-2 rounded-full bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/80 transition-colors shadow-2xs"
           >
             <Sparkles className="w-4 h-4" />
@@ -138,7 +142,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             }`}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
-            <span>{inCart ? 'Added' : 'Add'}</span>
+            <span>{inCart ? t('catalog.inCart') : t('catalog.addToCart')}</span>
           </button>
         </div>
       </div>

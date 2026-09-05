@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:cart": "node --experimental-strip-types src/context/cartStorage.test.ts"
+    "test:cart": "node --experimental-strip-types src/context/cartStorage.test.ts",
+    "test:i18n": "npx tsx src/i18n/i18n.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

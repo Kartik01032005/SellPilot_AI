@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useCart } from '@/context/CartContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { X, Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck } from 'lucide-react';
 
 interface CartDrawerProps {
@@ -18,6 +19,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
     preparedCheckout,
     prepareCheckoutLoading,
   } = useCart();
+  const { t } = useLanguage();
 
   if (!isCartOpen) return null;
 
@@ -39,16 +41,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                 <ShoppingBag className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Your Cart</h2>
+                <h2 className="text-base font-bold text-slate-900">{t('cart.title')}</h2>
                 <p className="text-xs text-slate-500 font-medium">
-                  {items.length} {items.length === 1 ? 'item' : 'items'} selected
+                  {t('cart.itemsCount', { count: items.length })}
                 </p>
               </div>
             </div>
 
             <button
               onClick={() => setIsCartOpen(false)}
-              aria-label="Close cart"
+              aria-label={t('common.close')}
               className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -60,9 +62,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
             {items.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
                 <ShoppingBag className="w-12 h-12 stroke-[1.5] mb-3 text-slate-300" />
-                <h3 className="text-sm font-bold text-slate-700">Your cart is empty</h3>
+                <h3 className="text-sm font-bold text-slate-700">{t('cart.emptyTitle')}</h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-[220px] font-medium">
-                  Explore products or ask SellPilot AI for smart recommendations.
+                  {t('cart.emptySubtitle')}
                 </p>
               </div>
             ) : (
@@ -104,7 +106,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                   <button
                     onClick={() => removeItem(it.productId)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-full hover:bg-rose-50"
-                    title="Remove item"
+                    title={t('cart.remove')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -118,20 +120,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
             <div className="p-6 border-t border-slate-100 bg-white space-y-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-                  <span>Server-Verified Subtotal</span>
+                  <span>{t('cart.subtotal')}</span>
                   <span className="font-semibold text-slate-800">₹{totalAmount.toLocaleString('en-IN')}</span>
                 </div>
                 {preparedCheckout && preparedCheckout.discount > 0 && (
                   <div className="flex items-center justify-between text-xs text-emerald-700 font-semibold">
-                    <span>Campaign Discount</span>
+                    <span>{t('cart.discount')}</span>
                     <span>-₹{preparedCheckout.discount.toLocaleString('en-IN')}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm font-extrabold text-slate-900 pt-2 border-t border-slate-100">
-                  <span>Total Amount</span>
+                  <span>{t('cart.total')}</span>
                   <span className="text-base text-brand-600 font-black">
                     {prepareCheckoutLoading
-                      ? 'Calculating...'
+                      ? t('common.loading')
                       : preparedCheckout
                         ? `₹${totalAmount.toLocaleString('en-IN')}`
                         : 'Unavailable'}
@@ -147,13 +149,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                 disabled={prepareCheckoutLoading || !preparedCheckout}
                 className="w-full py-3.5 rounded-full bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-95"
               >
-                <span>Proceed to Checkout</span>
+                <span>{t('cart.checkoutBtn')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
               <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-500 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>HMAC-SHA256 Razorpay Payment Safety</span>
+                <span>{t('cart.verifiedCheckout')}</span>
               </div>
             </div>
           )}

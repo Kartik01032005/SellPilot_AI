@@ -134,7 +134,7 @@ const defaultSampleProducts: ProductItem[] = [
 
 export default function HomePage() {
   const { user } = useAuth();
-  const { language, languageNames } = useLanguage();
+  const { language, languageNames, t } = useLanguage();
 
   // Navigation & Modals
   const [activeTab, setActiveTab] = useState<'discovery' | 'merchant' | 'orders'>('discovery');
@@ -227,7 +227,28 @@ export default function HomePage() {
     fetchProducts();
   }, [fetchProducts]);
 
+  // Route Guard: Ensure customer accounts cannot remain in merchant tab
+  useEffect(() => {
+    if (user?.role === 'customer' && activeTab === 'merchant') {
+      setActiveTab('discovery');
+    }
+  }, [user?.role, activeTab]);
+
   const categories = ['All', 'Shoes', 'Laptops', 'Phones', 'Cameras', 'Accessories', 'Electronics', 'Clothing'];
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'All': return t('catalog.categoryAll');
+      case 'Shoes': return t('catalog.categories.shoes');
+      case 'Laptops': return t('catalog.categories.laptops');
+      case 'Phones': return t('catalog.categories.phones');
+      case 'Cameras': return t('catalog.categories.cameras');
+      case 'Accessories': return t('catalog.categories.accessories');
+      case 'Electronics': return t('catalog.categories.electronics');
+      case 'Clothing': return t('catalog.categories.clothing');
+      default: return cat;
+    }
+  };
 
   const handleAskAIWithProduct = (prod: ProductItem) => {
     setChatInitialMode('buyer');
@@ -236,20 +257,20 @@ export default function HomePage() {
 
   const faqs = [
     {
-      q: 'How does Romanized multilingual AI shopping work?',
-      a: 'SellPilot AI recognizes Romanized Indian scripts (such as "nanage shoes beku under 3000" in Kannada, Hinglish, Tanglish, and Telugu). It parses intent, extracts budget caps, and matches live inventory through deterministic server-side queries.',
+      q: t('faqs.q1'),
+      a: t('faqs.a1'),
     },
     {
-      q: 'What prevents AI hallucination on prices and discounts?',
-      a: 'The LLM never computes final prices or discounts. All pricing, promotional discounts (capped by merchant guardrails at max 25%), subtotal math, and stock deductions are executed entirely by deterministic server verification before checkout.',
+      q: t('faqs.q2'),
+      a: t('faqs.a2'),
     },
     {
-      q: 'How are inventory double-deductions prevented?',
-      a: 'Stock is only deducted after Razorpay HMAC-SHA256 signature verification succeeds on the server. Deductions use atomic database operations and an idempotent order-lifecycle lock that prevents double decrement even on concurrent retries.',
+      q: t('faqs.q3'),
+      a: t('faqs.a3'),
     },
     {
-      q: 'What happens when a customer cancels an order?',
-      a: 'When an eligible order (pending, paid, or processing) is cancelled, all purchased item quantities are atomically restocked into the active merchant catalog, and an immutable audit log is generated.',
+      q: t('faqs.q4'),
+      a: t('faqs.a4'),
     },
   ];
 
@@ -278,19 +299,19 @@ export default function HomePage() {
               <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full border border-brand-200/80 bg-brand-50/80 text-brand-700 text-xs font-bold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-brand-500 animate-ping" />
                 <Sparkles className="w-3.5 h-3.5 text-brand-600" />
-                <span>SellPilot AI 2.0 • Bounded Agentic Commerce & Razorpay Test Mode</span>
+                <span>{t('hero.badge')}</span>
               </div>
 
               {/* Bold SaaS Headline with Manrope Typography */}
               <div className="max-w-4xl mx-auto space-y-4">
                 <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.08]">
-                  Conversational Commerce, <br />
+                  {t('hero.titleLine1')} <br />
                   <span className="bg-gradient-to-r from-brand-600 via-sky-600 to-indigo-600 bg-clip-text text-transparent">
-                    Guarded by Deterministic Logic.
+                    {t('hero.titleLine2')}
                   </span>
                 </h1>
                 <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed font-medium">
-                  SellPilot AI empowers shoppers to search naturally in English or Romanized Indian languages (Hindi, Kannada, Tamil, Telugu), while providing merchants with AI growth opportunities protected by strict guardrails.
+                  {t('hero.subtitle')}
                 </p>
               </div>
 
@@ -304,7 +325,7 @@ export default function HomePage() {
                   className="px-6 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-card hover:shadow-hover flex items-center space-x-2 active:scale-95 transition-all"
                 >
                   <Sparkles className="w-4 h-4 text-brand-300" />
-                  <span>Launch AI Assistant</span>
+                  <span>{t('hero.launchAssistant')}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
@@ -314,7 +335,7 @@ export default function HomePage() {
                   }}
                   className="px-6 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200 shadow-2xs hover:shadow-soft active:scale-95 transition-all"
                 >
-                  Explore Catalog
+                  {t('hero.exploreCatalog')}
                 </button>
               </div>
 
@@ -334,7 +355,7 @@ export default function HomePage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={`Search or ask: e.g. ${languageNames[language]?.sample || 'running shoes under 3000'}`}
+                    placeholder={t('hero.searchPlaceholder', { sample: languageNames[language]?.sample || 'running shoes under 3000' })}
                     className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none py-1.5 font-medium"
                   />
                   <button
@@ -342,13 +363,13 @@ export default function HomePage() {
                     className="px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm flex items-center space-x-1.5 transition-all shrink-0 active:scale-95"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-brand-300" />
-                    <span>Ask AI</span>
+                    <span>{t('hero.askAIBtn')}</span>
                   </button>
                 </form>
 
                 {/* Quick Romanized Suggestions */}
                 <div className="mt-3 flex flex-wrap justify-center items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                  <span className="font-semibold text-slate-400">Try Romanized:</span>
+                  <span className="font-semibold text-slate-400">{t('hero.tryRomanized')}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -384,14 +405,14 @@ export default function HomePage() {
                           <div className="w-3 h-3 rounded-full bg-amber-400" />
                           <div className="w-3 h-3 rounded-full bg-emerald-400" />
                         </div>
-                        <span className="text-xs font-mono font-bold text-slate-500">SellPilot AI — Autonomous Guardrail Gateway</span>
+                        <span className="text-xs font-mono font-bold text-slate-500">{t('hero.gatewayTitle')}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Razorpay Test Mode
+                          <CheckCircle2 className="w-3 h-3" /> {t('hero.testModeBadge')}
                         </span>
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
-                          HMAC-SHA256 Verified
+                          {t('hero.hmacBadge')}
                         </span>
                       </div>
                     </div>
@@ -402,23 +423,23 @@ export default function HomePage() {
                       <div className="md:col-span-2 p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3 shadow-2xs">
                         <div className="flex items-center justify-between text-xs text-slate-500">
                           <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                            <MessageSquare className="w-3.5 h-3.5 text-brand-600" /> Multilingual Stream
+                            <MessageSquare className="w-3.5 h-3.5 text-brand-600" /> {t('hero.multilingualStream')}
                           </span>
-                          <span className="font-mono text-[10px] text-slate-400">Response &lt; 180ms</span>
+                          <span className="font-mono text-[10px] text-slate-400">{t('hero.responseSpeed')}</span>
                         </div>
                         <div className="space-y-2.5 text-xs">
                           <div className="p-3 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/70">
-                            <span className="text-[10px] font-bold text-slate-400 block mb-0.5">BUYER (Romanized Hindi)</span>
-                            &ldquo;Mujhe marathon ke liye badhiya running shoes dikhao ₹3000 ke andar&rdquo;
+                            <span className="text-[10px] font-bold text-slate-400 block mb-0.5">{t('hero.buyerSampleBadge')}</span>
+                            &ldquo;{t('hero.buyerSampleText')}&rdquo;
                           </div>
                           <div className="p-3.5 rounded-xl bg-brand-50/70 border border-brand-200/70 text-slate-800 space-y-1.5">
-                            <span className="text-[10px] font-bold text-brand-700 block">SELLPILOT COPILOT</span>
+                            <span className="text-[10px] font-bold text-brand-700 block">{t('hero.copilotBadge')}</span>
                             <p className="font-medium">
-                              Mil gaye! <strong>Pro Carbon Running Shoes</strong> marathon running ke liye best hain. Carbon-plate cushioning aur high energy return feature hai.
+                              {t('hero.copilotSampleText')}
                             </p>
                             <div className="flex items-center justify-between pt-1 text-[11px]">
-                              <span className="font-bold text-slate-900">₹2,999 • Verified In Stock</span>
-                              <span className="text-slate-500 font-medium">Inventory: 12 units</span>
+                              <span className="font-bold text-slate-900">₹2,999 • {t('hero.verifiedStock')}</span>
+                              <span className="text-slate-500 font-medium">{t('hero.stockCount', { count: 12 })}</span>
                             </div>
                           </div>
                         </div>
@@ -428,31 +449,37 @@ export default function HomePage() {
                       <div className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3 shadow-2xs flex flex-col justify-between">
                         <div>
                           <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
-                            <ShieldCheck className="w-3.5 h-3.5 text-brand-600" /> Guardrail Pipeline
+                            <ShieldCheck className="w-3.5 h-3.5 text-brand-600" /> {t('hero.guardrailPipeline')}
                           </span>
                           <div className="space-y-2 text-[11px]">
                             <div className="flex justify-between py-1 border-b border-slate-100">
-                              <span className="text-slate-500">Max Discount Limit</span>
-                              <strong className="text-slate-900 font-mono">25% Max</strong>
+                              <span className="text-slate-500">{t('hero.maxDiscountLabel')}</span>
+                              <strong className="text-slate-900 font-mono">{t('hero.maxDiscountValue')}</strong>
                             </div>
                             <div className="flex justify-between py-1 border-b border-slate-100">
-                              <span className="text-slate-500">Stock Decrement</span>
-                              <strong className="text-emerald-700 font-mono">Post-Signature</strong>
+                              <span className="text-slate-500">{t('hero.stockDecrementLabel')}</span>
+                              <strong className="text-emerald-700 font-mono">{t('hero.stockDecrementValue')}</strong>
                             </div>
                             <div className="flex justify-between py-1 border-b border-slate-100">
-                              <span className="text-slate-500">Audit Trail</span>
-                              <strong className="text-brand-600 font-mono">Immutable</strong>
+                              <span className="text-slate-500">{t('hero.auditTrailLabel')}</span>
+                              <strong className="text-brand-600 font-mono">{t('hero.auditTrailValue')}</strong>
                             </div>
                           </div>
                         </div>
                         <div className="pt-2">
                           <button
                             onClick={() => {
-                              setActiveTab('merchant');
+                              if (!user) {
+                                setIsAuthOpen(true);
+                              } else if (user.role === 'customer') {
+                                alert('Merchant Hub is restricted to merchant accounts. You are currently logged in as a customer.');
+                              } else {
+                                setActiveTab('merchant');
+                              }
                             }}
                             className="w-full py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors"
                           >
-                            Open Merchant Hub
+                            {user?.role === 'customer' ? t('hero.merchantOnlyHub') : t('hero.openMerchantHub')}
                           </button>
                         </div>
                       </div>
@@ -466,20 +493,20 @@ export default function HomePage() {
             <section className="py-6 border-y border-slate-200/80 bg-white/70 backdrop-blur-xs rounded-3xl px-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">100%</div>
-                  <div className="text-xs text-slate-500 font-bold mt-1">Deterministic Math Bounds</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{t('trust.metric1Value')}</div>
+                  <div className="text-xs text-slate-500 font-bold mt-1">{t('trust.metric1Label')}</div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-brand-600 tracking-tight">4+</div>
-                  <div className="text-xs text-slate-500 font-bold mt-1">Indian Regional Languages</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-brand-600 tracking-tight">{t('trust.metric2Value')}</div>
+                  <div className="text-xs text-slate-500 font-bold mt-1">{t('trust.metric2Label')}</div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-indigo-600 tracking-tight">&lt;200ms</div>
-                  <div className="text-xs text-slate-500 font-bold mt-1">Verified Price Engine</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-indigo-600 tracking-tight">{t('trust.metric3Value')}</div>
+                  <div className="text-xs text-slate-500 font-bold mt-1">{t('trust.metric3Label')}</div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Zero</div>
-                  <div className="text-xs text-slate-500 font-bold mt-1">Double-Deductions</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{t('trust.metric4Value')}</div>
+                  <div className="text-xs text-slate-500 font-bold mt-1">{t('trust.metric4Label')}</div>
                 </div>
               </div>
             </section>
@@ -487,12 +514,12 @@ export default function HomePage() {
             {/* FEATURES SECTION (GRID) */}
             <section className="space-y-10">
               <div className="text-center max-w-2xl mx-auto space-y-2">
-                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Engine Architecture</span>
+                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">{t('trust.whyTitle')}</span>
                 <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                  Engineered for Zero-Trust E-Commerce
+                  {t('trust.whySubtitle')}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                  Every AI action is bounded by server validation, cryptographic payment verification, and audit trails.
+                  {t('hero.subtitle')}
                 </p>
               </div>
 
@@ -502,9 +529,9 @@ export default function HomePage() {
                   <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center border border-brand-200/60 shadow-2xs">
                     <Globe2 className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">Romanized Multilingual AI</h3>
+                  <h3 className="text-base font-bold text-slate-900">{t('trust.card1Title')}</h3>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    Understands natural Romanized scripts across Kannada, Hindi, Tamil, and Telugu without forcing English-only interactions.
+                    {t('trust.card1Desc')}
                   </p>
                 </div>
 
@@ -513,9 +540,9 @@ export default function HomePage() {
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-200/60 shadow-2xs">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">Deterministic Guardrails</h3>
+                  <h3 className="text-base font-bold text-slate-900">{t('trust.card2Title')}</h3>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    AI suggestions are strictly bounded. Discount promotions cannot exceed merchant caps (25%) and must undergo approval gates.
+                    {t('trust.card2Desc')}
                   </p>
                 </div>
 
@@ -524,9 +551,9 @@ export default function HomePage() {
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200/60 shadow-2xs">
                     <CreditCard className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">Razorpay Cryptographic Flow</h3>
+                  <h3 className="text-base font-bold text-slate-900">{t('trust.card3Title')}</h3>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    Razorpay order creation, test checkout modal, and backend HMAC-SHA256 signature verification with atomic inventory locks.
+                    {t('trust.card3Desc')}
                   </p>
                 </div>
               </div>
@@ -535,7 +562,7 @@ export default function HomePage() {
             {/* HOW IT WORKS (4-STEP FLOW) */}
             <section className="p-8 sm:p-12 rounded-3xl bg-white border border-slate-200/90 shadow-soft space-y-10">
               <div className="text-center max-w-2xl mx-auto space-y-2">
-                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">How It Works</span>
+                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">SellPilot Flow</span>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                   The Complete Verified Transaction Flow
                 </h2>
@@ -588,19 +615,19 @@ export default function HomePage() {
             <section id="catalog-section" className="space-y-8 pt-4">
               <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
                 <div>
-                  <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Live Inventory</span>
+                  <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">{t('catalog.title')}</span>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    Verified Product Catalog
+                    {t('catalog.subtitle')}
                   </h2>
                   <p className="text-xs text-slate-500 mt-1 font-medium">
-                    Explore products verified for real-time stock and server-enforced pricing.
+                    {t('trust.card4Desc')}
                   </p>
                 </div>
 
                 {/* Price Range Slider */}
                 <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
                   <span className="text-xs text-slate-600 font-bold whitespace-nowrap">
-                    Max: <strong className="text-slate-900 font-black">₹{maxPriceFilter.toLocaleString('en-IN')}</strong>
+                    {t('catalog.maxPriceLabel')}: <strong className="text-slate-900 font-black">₹{maxPriceFilter.toLocaleString('en-IN')}</strong>
                   </span>
                   <input
                     type="range"
@@ -633,7 +660,7 @@ export default function HomePage() {
                         : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
                     }`}
                   >
-                    {cat}
+                    {getCategoryLabel(cat)}
                   </button>
                 ))}
               </div>
@@ -651,9 +678,9 @@ export default function HomePage() {
               ) : products.length === 0 ? (
                 <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 space-y-3 shadow-soft">
                   <Search className="w-10 h-10 text-slate-300 mx-auto" />
-                  <h3 className="text-base font-bold text-slate-800">No products match your criteria</h3>
+                  <h3 className="text-base font-bold text-slate-800">{t('catalog.noProducts')}</h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto font-medium">
-                    Try adjusting your price filter or category selection, or ask SellPilot AI for recommendations.
+                    {t('catalog.resetFilters')}
                   </p>
                 </div>
               ) : (
@@ -758,9 +785,9 @@ export default function HomePage() {
             {/* TESTIMONIALS / SOCIAL PROOF */}
             <section className="p-8 sm:p-12 rounded-3xl bg-white border border-slate-200/90 shadow-soft space-y-8">
               <div className="text-center max-w-2xl mx-auto space-y-2">
-                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Customer Proof</span>
+                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">{t('testimonials.tag')}</span>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  Trusted by Next-Generation Merchants
+                  {t('testimonials.title')}
                 </h2>
               </div>
 
@@ -772,11 +799,11 @@ export default function HomePage() {
                     ))}
                   </div>
                   <p className="text-xs text-slate-600 italic font-medium">
-                    &ldquo;Our customers love ordering in conversational Hindi and Kannada. The AI finds the exact running shoes and never messes up discount limits.&rdquo;
+                    &ldquo;{t('testimonials.quote1')}&rdquo;
                   </p>
                   <div>
-                    <strong className="text-xs text-slate-900 block font-bold">Vikram Mehta</strong>
-                    <span className="text-[10px] text-slate-500 font-medium">Founder, SportHub India</span>
+                    <strong className="text-xs text-slate-900 block font-bold">{t('testimonials.author1Name')}</strong>
+                    <span className="text-[10px] text-slate-500 font-medium">{t('testimonials.author1Role')}</span>
                   </div>
                 </div>
 
@@ -787,11 +814,11 @@ export default function HomePage() {
                     ))}
                   </div>
                   <p className="text-xs text-slate-600 italic font-medium">
-                    &ldquo;The Razorpay payment verification combined with zero double-deduction inventory locks makes this completely rock solid for production.&rdquo;
+                    &ldquo;{t('testimonials.quote2')}&rdquo;
                   </p>
                   <div>
-                    <strong className="text-xs text-slate-900 block font-bold">Ananya Sharma</strong>
-                    <span className="text-[10px] text-slate-500 font-medium">Head of Product, Apex Retail</span>
+                    <strong className="text-xs text-slate-900 block font-bold">{t('testimonials.author2Name')}</strong>
+                    <span className="text-[10px] text-slate-500 font-medium">{t('testimonials.author2Role')}</span>
                   </div>
                 </div>
 
@@ -802,11 +829,11 @@ export default function HomePage() {
                     ))}
                   </div>
                   <p className="text-xs text-slate-600 italic font-medium">
-                    &ldquo;The merchant growth insights automatically flagged excess stock and suggested bounded promotions that boosted our conversion rate by 34%.&rdquo;
+                    &ldquo;{t('testimonials.quote3')}&rdquo;
                   </p>
                   <div>
-                    <strong className="text-xs text-slate-900 block font-bold">Karthik R.</strong>
-                    <span className="text-[10px] text-slate-500 font-medium">E-Commerce Director, UrbanStyle</span>
+                    <strong className="text-xs text-slate-900 block font-bold">{t('testimonials.author3Name')}</strong>
+                    <span className="text-[10px] text-slate-500 font-medium">{t('testimonials.author3Role')}</span>
                   </div>
                 </div>
               </div>
@@ -815,9 +842,9 @@ export default function HomePage() {
             {/* FAQ ACCORDION SECTION */}
             <section className="space-y-8 max-w-3xl mx-auto">
               <div className="text-center space-y-2">
-                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Got Questions?</span>
+                <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">{t('faqs.tag')}</span>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  Frequently Asked Questions
+                  {t('faqs.title')}
                 </h2>
               </div>
 
@@ -852,7 +879,9 @@ export default function HomePage() {
         )}
 
         {/* VIEW: Merchant Hub */}
-        {activeTab === 'merchant' && <MerchantDashboard />}
+        {activeTab === 'merchant' && (
+          <MerchantDashboard onBackToDiscovery={() => setActiveTab('discovery')} />
+        )}
 
         {/* VIEW: Customer Orders */}
         {activeTab === 'orders' && <CustomerOrders />}
@@ -868,13 +897,13 @@ export default function HomePage() {
               </div>
               <span className="font-bold text-slate-900">SellPilot AI</span>
               <span>—</span>
-              <span>Razorpay Track 01 (AI Growth & Agentic Commerce)</span>
+              <span>{t('footer.track')}</span>
             </div>
             <div className="flex items-center space-x-4">
               <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Bounded & Deterministic
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> {t('footer.bounded')}
               </span>
-              <span className="text-slate-400 font-mono">Razorpay Test Mode</span>
+              <span className="text-slate-400 font-mono">{t('footer.testMode')}</span>
             </div>
           </div>
           <div className="text-center text-[11px] text-slate-400 pt-4 border-t border-slate-100 font-medium">

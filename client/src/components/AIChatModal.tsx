@@ -13,6 +13,7 @@ import {
   Store,
   ShoppingCart,
   TrendingUp,
+  Sparkles,
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
@@ -32,6 +33,8 @@ interface ChatMessage {
     category: string;
     available: boolean;
     reason?: string;
+    upsell?: { productId: string; name: string; price: number; priceDiff: number; reason: string } | null;
+    crossSells?: Array<{ productId: string; name: string; price: number; category?: string; reason: string }>;
     currentCartTotal?: number;
     quantityAdded?: number;
     newCartTotal?: number;
@@ -70,6 +73,54 @@ interface AIChatModalProps {
   onCorrelationId?: (correlationId: string) => void;
 }
 
+const formatChatMessage = (text: string, isUser: boolean) => {
+  if (isUser) {
+    return <p className="whitespace-pre-wrap">{text}</p>;
+  }
+
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={idx} className="h-1.5" />;
+        }
+
+        const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || /^\d+\.\s/.test(trimmed);
+        const bulletContent = isBullet ? trimmed.replace(/^([•\-]\s*|\d+\.\s*)/, '') : line;
+
+        // Parse **bold** markers
+        const parts = bulletContent.split(/(\*\*.*?\*\*)/g).map((part, pIdx) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <strong key={pIdx} className="font-bold text-slate-900">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          return part;
+        });
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 py-0.5 pl-1">
+              <span className="text-brand-600 font-bold leading-tight select-none mt-0.5">•</span>
+              <span className="flex-1 text-slate-700">{parts}</span>
+            </div>
+          );
+        }
+
+        return (
+          <p key={idx} className="text-slate-800 font-medium">
+            {parts}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 export const AIChatModal: React.FC<AIChatModalProps> = ({
   isOpen,
   onClose,
@@ -79,9 +130,17 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
 }) => {
   const { user } = useAuth();
   const { addItem, syncCart, addApprovedRecommendation } = useCart();
-  const { language, languageNames } = useLanguage();
+  const { language, languageNames, t } = useLanguage();
 
-  const [mode, setMode] = useState<'buyer' | 'merchant'>(initialMode);
+  const [mode, setMode] = useState<'buyer' | 'merchant'>(
+    user?.role === 'customer' ? 'buyer' : initialMode
+  );
+
+  useEffect(() => {
+    if (user?.role === 'customer' && mode !== 'buyer') {
+      setMode('buyer');
+    }
+  }, [user?.role, mode]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -132,13 +191,13 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         sender: 'agent',
         text:
           mode === 'buyer'
-            ? 'Hello! I am SellPilot AI. Tell me what product you are looking for, your budget, or desired features, and I will match verified catalog products with price bounds.'
-            : 'Welcome to SellPilot Merchant Hub. Ask me about product performance, promotion opportunities, upsells, or campaign discount ideas.',
+            ? t('chat.initialGreetingBuyer')
+            : t('chat.initialGreetingMerchant'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => (prev.length === 0 ? [initialGreeting] : prev));
     }
-  }, [isOpen, mode]);
+  }, [isOpen, mode, t]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -147,20 +206,21 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   if (!isOpen) return null;
 
   const buyerPromptChips = [
-    'I need running shoes under 3000',
-    'nanage running shoes beku under 3000',
-    'mujhe running shoes chahiye under 2500',
-    'laptop under 50k with 16gb ram',
-    'Which is cheapest?',
-    'buy this now',
+    t('chat.chip1Buyer'),
+    t('chat.chip2Buyer'),
+    t('chat.chip3Buyer'),
+    t('chat.chip4Buyer'),
+    t('chat.chip5Buyer'),
+    t('chat.chip6Buyer'),
   ];
 
   const merchantPromptChips = [
-    'What should I promote?',
-    'Which product has the best opportunity?',
-    'What should I cross-sell?',
-    'Can I give a 20% discount?',
-    'Give everyone an 80% discount on shoes',
+    t('chat.chip1Merchant'),
+    t('chat.chip2Merchant'),
+    t('chat.chip3Merchant'),
+    t('chat.chip4Merchant'),
+    t('chat.chip5Merchant'),
+    t('chat.chip6Merchant'),
   ];
 
   const activeChips = mode === 'buyer' ? buyerPromptChips : merchantPromptChips;
@@ -274,49 +334,51 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-bold text-sm sm:text-base text-slate-900">SellPilot AI Assistant</h3>
+                <h3 className="font-bold text-sm sm:text-base text-slate-900">{t('chat.assistantTitle')}</h3>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
-                  Agentic Commerce
+                  {t('chat.agenticCommerce')}
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                Language: {languageNames[language]?.label || 'English'}
+                {t('chat.languageLabel')}: {languageNames[language]?.label || 'English'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Mode Switcher */}
-            <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => setMode('buyer')}
-                className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
-                  mode === 'buyer'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Compass className="w-3 h-3 text-brand-600" />
-                <span>Buyer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('merchant')}
-                className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
-                  mode === 'merchant'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Store className="w-3 h-3 text-brand-600" />
-                <span>Merchant</span>
-              </button>
-            </div>
+            {/* Mode Switcher - only available to merchants or visitors */}
+            {(!user || user.role !== 'customer') && (
+              <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => setMode('buyer')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
+                    mode === 'buyer'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Compass className="w-3 h-3 text-brand-600" />
+                  <span>{t('chat.buyerTab')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('merchant')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 transition-all ${
+                    mode === 'merchant'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Store className="w-3 h-3 text-brand-600" />
+                  <span>{t('chat.merchantTab')}</span>
+                </button>
+              </div>
+            )}
 
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('common.close')}
               className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -338,13 +400,13 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                     : 'bg-white border border-slate-200/90 text-slate-800 rounded-bl-none shadow-soft'
                 }`}
               >
-                <p className="whitespace-pre-wrap">{msg.text}</p>
+                {formatChatMessage(msg.text, msg.sender === 'user')}
 
                 {/* Structured Products Output from AI */}
                 {msg.products && msg.products.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-100 space-y-2.5">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Recommended Verified Products
+                      {t('catalog.title')}
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {msg.products.map((p) => (
@@ -383,21 +445,74 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                               </div>
                             )}
                           </div>
+
+                          {/* Per-product recommendations */}
+                          {p.upsell && (() => {
+                            const upsellItem = p.upsell;
+                            return (
+                              <div className="mt-2 p-1.5 rounded-xl bg-indigo-50/80 border border-indigo-100 flex items-center justify-between text-[10px]">
+                                <span className="text-indigo-800 font-medium truncate">
+                                  Upgrade: {upsellItem.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleAddRecommendation({
+                                      productId: upsellItem.productId,
+                                      name: upsellItem.name,
+                                      price: upsellItem.price,
+                                      recommendationType: 'UPSELL',
+                                    })
+                                  }
+                                  className="shrink-0 ml-1.5 px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold text-[9px] hover:bg-indigo-500"
+                                >
+                                  +₹{upsellItem.priceDiff ? upsellItem.priceDiff.toLocaleString('en-IN') : upsellItem.price.toLocaleString('en-IN')}
+                                </button>
+                              </div>
+                            );
+                          })()}
+                          {p.crossSells && p.crossSells.length > 0 && (
+                            <div className="mt-1.5 p-1.5 rounded-xl bg-emerald-50/70 border border-emerald-100 space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-emerald-800 block">
+                                Recommended Pairing
+                              </span>
+                              {p.crossSells.slice(0, 1).map((cs: any) => (
+                                <div key={cs.productId} className="flex items-center justify-between text-[10px]">
+                                  <span className="text-slate-700 font-medium truncate">{cs.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleAddRecommendation({
+                                        productId: cs.productId,
+                                        name: cs.name,
+                                        price: cs.price,
+                                        category: cs.category,
+                                        recommendationType: 'CROSS_SELL',
+                                      })
+                                    }
+                                    className="shrink-0 ml-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold text-[9px] hover:bg-emerald-500"
+                                  >
+                                    +₹{cs.price.toLocaleString('en-IN')}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           <button
                             type="button"
                             onClick={() =>
-                              handleAddRecommendation({
+                              addItem({
                                 productId: p.id,
                                 name: p.name,
                                 price: p.price,
                                 category: p.category,
-                                recommendationType: 'CROSS_SELL',
                               })
                             }
                             className="mt-3 w-full py-1.5 rounded-full bg-white hover:bg-slate-900 text-slate-800 hover:text-white border border-slate-200 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition-all shadow-2xs"
                           >
                             <ShoppingCart className="w-3 h-3" />
-                            <span>Add to Cart</span>
+                            <span>{t('catalog.addToCart')}</span>
                           </button>
                         </div>
                       ))}
@@ -410,7 +525,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                   <div className="mt-3 p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 text-xs">
                     <div className="flex items-center space-x-1.5 text-indigo-700 font-bold mb-1">
                       <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Value Upsell Suggestion</span>
+                      <span>{t('recommendations.upsellTitle')}</span>
                     </div>
                     <p className="text-slate-600 text-[11px] font-medium">{msg.upsell.reason}</p>
                     {msg.upsell.currentCartTotal !== undefined && msg.upsell.newCartTotal !== undefined && (
@@ -442,8 +557,49 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                         }
                         className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-2xs transition-colors"
                       >
-                        Add Upgrade
+                        {t('recommendations.approveAndAdd')}
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cross-Sell Recommendations Card */}
+                {msg.crossSells && msg.crossSells.length > 0 && (
+                  <div className="mt-3 p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-xs space-y-2">
+                    <div className="flex items-center space-x-1.5 text-emerald-800 font-bold">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{t('recommendations.crossSellTitle')}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {msg.crossSells.map((cs) => (
+                        <div
+                          key={cs.productId}
+                          className="p-2.5 rounded-xl bg-white/90 border border-emerald-100 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-bold text-slate-900 block truncate">{cs.name}</span>
+                            <span className="text-[11px] text-slate-500 line-clamp-1 block">{cs.reason}</span>
+                            <span className="text-xs font-black text-emerald-700 block mt-0.5">
+                              ₹{cs.price.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleAddRecommendation({
+                                productId: cs.productId,
+                                name: cs.name,
+                                price: cs.price,
+                                recommendationType: 'CROSS_SELL',
+                              })
+                            }
+                            className="shrink-0 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center space-x-1 shadow-2xs transition-colors"
+                          >
+                            <ShoppingCart className="w-3 h-3" />
+                            <span>{t('catalog.addToCart')}</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -460,7 +616,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                       className="w-full py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm flex items-center justify-center space-x-1.5 transition-all"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Proceed to Verified Checkout</span>
+                      <span>{t('chat.proceedCheckoutBtn')}</span>
                     </button>
                   </div>
                 )}
@@ -472,7 +628,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           {loading && (
             <div className="flex items-center space-x-2 text-xs text-brand-700 bg-brand-50 border border-brand-200/80 p-3 rounded-2xl max-w-[210px]">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-600" />
-              <span className="font-semibold">Analyzing verified catalog...</span>
+              <span className="font-semibold">{t('common.loading')}</span>
             </div>
           )}
           <div ref={chatEndRef} />
@@ -529,7 +685,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={
               mode === 'buyer'
-                ? `Search or ask in ${languageNames[language]?.label}... (e.g. shoes under 3000)`
+                ? t('chat.inputPlaceholder')
                 : 'Ask for merchant insights, promotions, or campaign advice...'
             }
             className="flex-1 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full px-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 transition-colors font-medium"

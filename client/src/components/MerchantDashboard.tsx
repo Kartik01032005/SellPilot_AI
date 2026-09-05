@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiClient } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   TrendingUp,
   Package,
@@ -18,6 +19,7 @@ import {
   RefreshCw,
   History,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 
 const getId = (value: unknown): string | undefined => {
@@ -29,8 +31,13 @@ const getId = (value: unknown): string | undefined => {
   return undefined;
 };
 
-export const MerchantDashboard: React.FC = () => {
+interface MerchantDashboardProps {
+  onBackToDiscovery?: () => void;
+}
+
+export const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ onBackToDiscovery }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'insights' | 'products' | 'campaigns' | 'audit'>('insights');
 
   // Insights State
@@ -123,11 +130,12 @@ export const MerchantDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    if (user?.role === 'customer') return;
     fetchInsights();
     fetchProducts();
     fetchCampaigns();
     fetchAuditLogs();
-  }, [user?.id, getId(user?.merchantId)]);
+  }, [user?.id, getId(user?.merchantId), user?.role]);
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,35 +162,33 @@ export const MerchantDashboard: React.FC = () => {
         setNewProdFeatures('');
         fetchProducts();
         fetchInsights();
+      } else {
+        alert('Failed to save product');
       }
     } catch {
-      alert(isEditing ? 'Error updating product' : 'Error creating product');
+      alert('Error saving product');
     }
   };
 
-  const handleEditProduct = (product: any) => {
-    setEditingProduct(product);
-    setNewProdName(product.name || '');
-    setNewProdCategory(product.category || 'Shoes');
-    setNewProdPrice(String(product.price ?? ''));
-    setNewProdStock(String(product.stock ?? ''));
-    setNewProdFeatures(Array.isArray(product.features) ? product.features.join(', ') : '');
+  const handleEditProduct = (prod: any) => {
+    setEditingProduct(prod);
+    setNewProdName(prod.name);
+    setNewProdCategory(prod.category);
+    setNewProdPrice(prod.price.toString());
+    setNewProdStock(prod.stock.toString());
+    setNewProdFeatures(prod.features?.join(', ') || '');
     setIsAddProductOpen(true);
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!id) return;
-    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to remove this product?')) return;
+    if (!confirm('Are you sure you want to delete this product?')) return;
     try {
-      const res = await ApiClient.request<{ success: boolean; message?: string }>(`/api/products/${id}`, {
+      const res = await ApiClient.request<{ success: boolean }>(`/api/products/${id}`, {
         method: 'DELETE',
       });
       if (res.success) {
-        setProducts((prev) => prev.filter((product) => (getId(product._id) || product.id || String(product._id)) !== id));
         fetchProducts();
         fetchInsights();
-      } else {
-        alert(res.message || 'Unable to delete product');
       }
     } catch {
       alert('Error deleting product');
@@ -215,7 +221,7 @@ export const MerchantDashboard: React.FC = () => {
         body: JSON.stringify({
           name: campName,
           discountPercentage: Number(campDiscount),
-          productIds: campProduct ? [campProduct] : [],
+          applicableProducts: campProduct ? [campProduct] : [],
         }),
       });
 
@@ -223,11 +229,12 @@ export const MerchantDashboard: React.FC = () => {
         setIsCreateCampaignOpen(false);
         setCampName('');
         setCampDiscount('');
+        setCampProduct('');
         setDiscountValidationMsg(null);
         fetchCampaigns();
         fetchAuditLogs();
       } else {
-        alert(res.message || 'Campaign creation failed');
+        alert(res.message || 'Campaign creation rejected by guardrails');
       }
     } catch {
       alert('Error creating campaign');
@@ -265,19 +272,43 @@ export const MerchantDashboard: React.FC = () => {
     }
   };
 
+  if (user?.role === 'customer') {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-rose-100 rounded-3xl shadow-card text-center space-y-5 animate-fade-in font-sans">
+        <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
+          <ShieldAlert className="w-7 h-7" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-extrabold text-slate-900">{t('merchant.accessRestrictedTitle')}</h2>
+          <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed font-medium">
+            {t('merchant.accessRestrictedDesc', { email: user.email })}
+          </p>
+        </div>
+        <div className="pt-2 flex justify-center">
+          <button
+            onClick={() => (onBackToDiscovery ? onBackToDiscovery() : window.location.reload())}
+            className="px-6 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+          >
+            {t('merchant.returnToDiscoveryBtn')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 font-sans">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center space-x-2.5">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Merchant Growth Hub</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t('merchant.title')}</h1>
             <span className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
-              Gated & Bounded
+              {t('merchant.gatedBadge')}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Data-driven revenue growth, autonomous opportunity discovery, and discount limit guardrails.
+            {t('merchant.subtitle')}
           </p>
         </div>
 
@@ -292,7 +323,7 @@ export const MerchantDashboard: React.FC = () => {
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5 text-brand-600" />
-            <span>Growth Insights</span>
+            <span>{t('merchant.tabInsights')}</span>
           </button>
           <button
             onClick={() => setActiveTab('products')}
@@ -303,7 +334,7 @@ export const MerchantDashboard: React.FC = () => {
             }`}
           >
             <Package className="w-3.5 h-3.5 text-brand-600" />
-            <span>Catalog ({products.length})</span>
+            <span>{t('merchant.tabProducts', { count: products.length })}</span>
           </button>
           <button
             onClick={() => setActiveTab('campaigns')}
@@ -314,7 +345,7 @@ export const MerchantDashboard: React.FC = () => {
             }`}
           >
             <Percent className="w-3.5 h-3.5 text-brand-600" />
-            <span>Campaigns ({campaigns.length})</span>
+            <span>{t('merchant.tabCampaigns', { count: campaigns.length })}</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
@@ -325,7 +356,7 @@ export const MerchantDashboard: React.FC = () => {
             }`}
           >
             <History className="w-3.5 h-3.5 text-brand-600" />
-            <span>Audit Trail</span>
+            <span>{t('merchant.tabAudit')}</span>
           </button>
         </div>
       </div>

@@ -64,7 +64,7 @@ export class RecommendationService {
 
     const upsellFilter: Record<string, unknown> = {
       category: currentProduct.category,
-      price: { $gt: currentProduct.price, $lte: currentProduct.price * 2 },
+      price: { $gt: currentProduct.price },
       stock: { $gt: 0 },
       isActive: true,
       _id: { $ne: currentProduct._id },
@@ -73,19 +73,34 @@ export class RecommendationService {
       upsellFilter.merchantId = currentProduct.merchantId;
     }
 
-    const upsellOption = await Product.findOne(upsellFilter).sort({ price: 1 });
+    let upsellOption = await Product.findOne(upsellFilter).sort({ price: 1 });
 
+    // Fallback: If no higher price in same category, check if an alternative top-tier configuration exists
     if (!upsellOption) {
+      const altFilter: Record<string, unknown> = {
+        category: currentProduct.category,
+        stock: { $gt: 0 },
+        isActive: true,
+        _id: { $ne: currentProduct._id },
+      };
+      if (currentProduct.merchantId) altFilter.merchantId = currentProduct.merchantId;
+      upsellOption = await Product.findOne(altFilter).sort({ price: -1 });
+    }
+
+    if (!upsellOption || upsellOption._id.toString() === currentProduct._id.toString()) {
       return null;
     }
 
-    const priceDiff = upsellOption.price - currentProduct.price;
+    const priceDiff = Math.max(0, upsellOption.price - currentProduct.price);
     return {
       productId: upsellOption._id.toString(),
       name: upsellOption.name,
       price: upsellOption.price,
-      currency: upsellOption.currency,
-      reason: `This premium option provides higher performance for ₹${priceDiff} more.`,
+      currency: upsellOption.currency || 'INR',
+      reason:
+        priceDiff > 0
+          ? `Premium upgrade offering higher performance and durability for ₹${priceDiff.toLocaleString('en-IN')} more.`
+          : `Top-rated alternative in ${currentProduct.category}.`,
       priceDiff,
     };
   }
@@ -100,9 +115,34 @@ export class RecommendationService {
       throw new CustomError('Product not found', 404, 'NOT_FOUND');
     }
 
-    const related = (currentProduct.relatedProducts as any[]).filter(
+    let related = ((currentProduct.relatedProducts as any[]) || []).filter(
       (p) => p && p.isActive && p.stock > 0 && (!currentProduct.merchantId || !p.merchantId || p.merchantId.toString() === currentProduct.merchantId.toString())
     );
+
+    // If no explicit relatedProducts linked, provide smart complementary pairing from accessories/electronics
+    if (related.length === 0) {
+      const fallbackFilter: Record<string, unknown> = {
+        _id: { $ne: currentProduct._id },
+        isActive: true,
+        stock: { $gt: 0 },
+      };
+      if (currentProduct.merchantId) {
+        fallbackFilter.merchantId = currentProduct.merchantId;
+      }
+
+      if (currentProduct.category === 'Laptops' || currentProduct.category === 'Electronics') {
+        fallbackFilter.category = { $in: ['Accessories', 'Electronics'] };
+      } else if (currentProduct.category === 'Shoes' || currentProduct.category === 'Clothing') {
+        fallbackFilter.category = { $in: ['Accessories', 'Clothing'] };
+      } else if (currentProduct.category === 'Phones' || currentProduct.category === 'Cameras') {
+        fallbackFilter.category = { $in: ['Accessories', 'Electronics'] };
+      } else {
+        fallbackFilter.category = { $ne: currentProduct.category };
+      }
+
+      const fallbacks = await Product.find(fallbackFilter).limit(2).exec();
+      related = fallbacks;
+    }
 
     return related.map((p) => ({
       productId: p._id.toString(),
@@ -110,7 +150,19 @@ export class RecommendationService {
       price: p.price,
       currency: p.currency || 'INR',
       category: p.category,
-      reason: `This product is commonly useful with ${currentProduct.name}.`,
+      reason: `Complementary item that pairs excellently with ${currentProduct.name}.`,
     }));
+  }
+
+  public static async getProductRecommendations(productId: string) {
+    const [upsell, crossSells] = await Promise.all([
+      this.getUpsellRecommendation(productId).catch(() => null),
+      this.getCrossSellRecommendation(productId).catch(() => []),
+    ]);
+
+    return {
+      upsell,
+      crossSells,
+    };
   }
 }
