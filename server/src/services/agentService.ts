@@ -317,73 +317,43 @@ const LOCALIZED_MERCHANT_STRINGS = {
   discountExceeded: (requestedPct: number, maxAllowed: number, lang: string) => {
     switch (lang) {
       case 'kn':
-        return `ನಾನು ${requestedPct}% ರಿಯಾಯಿತಿಯನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ ಏಕೆಂದರೆ ಅದು ನಿಮ್ಮ ಕಾನ್ಫಿಗರ್ ಮಾಡಿದ ಮಿತಿಯಾದ ${maxAllowed}% ಅನ್ನು ಮೀರಿದೆ. ಸುರಕ್ಷಿತ ಮಿತಿ ${maxAllowed}% ವರೆಗೆ ಇರುತ್ತದೆ.`;
+        return `ಇಲ್ಲ. ${requestedPct}% ರಿಯಾಯಿತಿ ನಿಮ್ಮ ಕಾನ್ಫಿಗರ್ ಮಾಡಿದ ಮಿತಿಯಾದ ${maxAllowed}% ಅನ್ನು ಮೀರಿದೆ. ಸುರಕ್ಷಿತ ಮಿತಿ ${maxAllowed}% ವರೆಗೆ ಇರುತ್ತದೆ.`;
       case 'hi':
-        return `मैं ${requestedPct}% छूट की सिफारिश नहीं कर सकता क्योंकि यह आपकी कॉन्फ़िगर की गई सीमा ${maxAllowed}% से अधिक है। सुरक्षित सीमा ${maxAllowed}% तक है।`;
+        return `नहीं. ${requestedPct}% छूट आपकी कॉन्फ़िगर की गई सीमा ${maxAllowed}% से अधिक है। सुरक्षित सीमा ${maxAllowed}% तक है।`;
       case 'ta':
-        return `நான் ${requestedPct}% தள்ளுபடியை பரிந்துரைக்க முடியாது, ஏனெனில் இது உங்கள் கட்டமைக்கப்பட்ட வரம்பான ${maxAllowed}% ஐ விட அதிகமாக உள்ளது. பாதுகாப்பான வரம்பு ${maxAllowed}% வரை.`;
+        return `இல்லை. ${requestedPct}% தள்ளுபடி உங்கள் கட்டமைக்கப்பட்ட வரம்பான ${maxAllowed}% ஐ விட அதிகமாக உள்ளது. பாதுகாப்பான வரம்பு ${maxAllowed}% வரை.`;
       case 'te':
-        return `నేను ${requestedPct}% తగ్గింపును సిఫార్సు చేయలేను ఎందుకంటే ఇది మీరు కాన్ఫిగర్ చేసిన పరిమితి ${maxAllowed}% కంటే ఎక్కువగా ఉంది. సురక్షిత పరిమితి ${maxAllowed}% వరకు ఉంటుంది.`;
+        return `కాదు. ${requestedPct}% తగ్గింపు మీరు కాన్ఫిగర్ చేసిన పరిమితి ${maxAllowed}% కంటే ఎక్కువగా ఉంది. సురక్షిత పరిమితి ${maxAllowed}% వరకు ఉంటుంది.`;
       default:
-        return `I cannot recommend an ${requestedPct}% discount because it exceeds your configured limit of ${maxAllowed}%. Safe limit is up to ${maxAllowed}%.`;
+        return `No. ${requestedPct}% exceeds your configured limit of ${maxAllowed}%. Safe limit is up to ${maxAllowed}%.`;
     }
   },
   discountApproved: (pct: number, targetName: string, priceDisplay: string, discountedPrice: string, lang: string) => {
     switch (lang) {
       case 'kn':
-        return `ರಿಯಾಯಿತಿ ಪರಿಶೀಲನೆ ವಿವರ:
-• ಉತ್ಪನ್ನ: ${targetName}${priceDisplay}
-• ರಿಯಾಯಿತಿ: ${pct}% ರಿಯಾಯಿತಿ ಸುರಕ್ಷಿತವಾಗಿದೆ ಮತ್ತು ಅಂಗಡಿಯ 25% ಮಾರ್ಜಿನ್ ಮಿತಿಯೊಳಗಿದೆ${discountedPrice}.
-• ವ್ಯಾಪಾರ ಪರಿಣಾಮ: ಆರೋಗ್ಯಕರ ಲಾಭವನ್ನು ಉಳಿಸಿಕೊಂಡು ಚೆಕ್‌ಔಟ್ ಪರಿಮಾಣವನ್ನು ಹೆಚ್ಚಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.`;
+        return `ಹೌದು, ${pct}% ರಿಯಾಯಿತಿ ನಿಮ್ಮ ಅಂಗಡಿಯ 25% ಮಿತಿಯೊಳಗೆ ಸುರಕ್ಷಿತವಾಗಿದೆ${targetName ? ` (${targetName}${priceDisplay})` : ''}.${discountedPrice ? ` ರಿಯಾಯಿತಿ ಬೆಲೆ: ${discountedPrice}.` : ''}\nಅನ್ವಯಿಸುವ ಮೊದಲು ಮಾರ್ಜಿನ್ ಪರಿಶೀಲಿಸಿ.`;
       case 'hi':
-        return `छूट मूल्यांकन परिणाम:
-• उत्पाद: ${targetName}${priceDisplay}
-• स्वीकृत छूट: ${pct}% की छूट सुरक्षित है और आपकी दुकान की 25% मार्जिन सीमा के भीतर है${discountedPrice}।
-• व्यावसायिक प्रभाव: स्वस्थ लाभ मार्जिन बनाए रखते हुए बिक्री बढ़ाने में मदद करेगा।`;
+        return `हाँ, ${pct}% छूट आपकी दुकान की 25% सीमा के भीतर सुरक्षित है${targetName ? ` (${targetName}${priceDisplay})` : ''}।${discountedPrice ? ` रियायती मूल्य: ${discountedPrice}।` : ''}\nलागू करने से पहले मार्जिन की पुष्टि करें।`;
       case 'ta':
-        return `தள்ளுபடி மதிப்பீடு:
-• தயாரிப்பு: ${targetName}${priceDisplay}
-• அனுமதிக்கப்பட்ட தள்ளுபடி: ${pct}% தள்ளுபடி பாதுகாப்பானது மற்றும் கடையின் 25% வரம்பிற்குள் உள்ளது${discountedPrice}.
-• வணிக தாக்கம்: ஆரோக்கியமான லாப வரம்புகளைப் பாதுகாத்து விற்பனையை அதிகரிக்கும்.`;
+        return `ஆம், ${pct}% தள்ளுபடி உங்கள் கடையின் 25% வரம்பிற்குள் பாதுகாப்பானது${targetName ? ` (${targetName}${priceDisplay})` : ''}.${discountedPrice ? ` தள்ளுபடி விலை: ${discountedPrice}.` : ''}\nபயன்படுத்துவதற்கு முன் லாப வரம்பை சரிபார்க்கவும்.`;
       case 'te':
-        return `తగ్గింపు మూల్యాంకనం:
-• ఉత్పత్తి: ${targetName}${priceDisplay}
-• ఆమోదించబడిన తగ్గింపు: ${pct}% తగ్గింపు సురక్షితమైనది మరియు 25% మార్జిన్ పరిమితిలో ఉంది${discountedPrice}.
-• వ్యాపార ప్రభావం: లాభాలను కాపాడుకుంటూ ఆర్డర్ల పరిమాణాన్ని పెంచుతుంది.`;
+        return `అవును, ${pct}% తగ్గింపు మీ 25% పరిమితిలో సురక్షితంగా ఉంది${targetName ? ` (${targetName}${priceDisplay})` : ''}.${discountedPrice ? ` రాయితీ ధర: ${discountedPrice}.` : ''}\nవర్తించే ముందు మార్జిన్‌ను తనిఖీ చేయండి.`;
       default:
-        return `Promotion Evaluation for ${targetName}:
-• Product & Price: ${targetName}${priceDisplay}
-• Discount Assessment: ${pct}% discount is safe and within your store's 25% margin ceiling${discountedPrice}.
-• Strategic Impact: Stimulates checkout volume while preserving healthy profit margins.`;
+        return `Yes, ${pct}% is safe and within your store's 25% limit${targetName ? ` for ${targetName}${priceDisplay}` : ''}.${discountedPrice ? ` Discounted price: ${discountedPrice}.` : ''}\nCheck margin before applying.`;
     }
   },
   bestOpportunity: (name: string, category: string, priceDisplay: string, stockDisplay: string, reason: string | undefined, lang: string) => {
     switch (lang) {
       case 'kn':
-        return `ಪ್ರಸ್ತುತ ನಿಮ್ಮ ಅತ್ಯುತ್ತಮ ಅವಕಾಶ:
-• ಉತ್ಪನ್ನ: ${category}ನಲ್ಲಿರುವ ${name}
-• ಬೆಲೆ & ದಾಸ್ತಾನು: ${priceDisplay}, ${stockDisplay}
-• ಕಾರಣ: ${reason || 'ಇದು ಗರಿಷ್ಠ ಆದಾಯಕ್ಕಾಗಿ ಬಲವಾದ ದಾಸ್ತಾನು ಮತ್ತು ಉತ್ತಮ ಮಾರ್ಜಿನ್ ಅನ್ನು ಸಂಯೋಜಿಸುತ್ತದೆ.'}`;
+        return `ಉತ್ತಮ ಅವಕಾಶ: ${category}ನಲ್ಲಿ ${name} (${priceDisplay}, ${stockDisplay}).\n${reason || 'ಬಲವಾದ ದಾಸ್ತಾನು ಮತ್ತು ಉತ್ತಮ ಮಾರ್ಜಿನ್‌ನೊಂದಿಗೆ ಗರಿಷ್ಠ ಆದಾಯ.'}`;
       case 'hi':
-        return `वर्तमान में आपका सबसे अच्छा अवसर:
-• उत्पाद: ${category} में ${name}
-• मूल्य और स्टॉक: ${priceDisplay}, ${stockDisplay}
-• रणनीतिक कारण: ${reason || 'यह अधिकतम राजस्व के लिए मजबूत इन्वेंट्री और स्वस्थ मार्जिन को जोड़ता है।'}`;
+        return `शीर्ष अवसर: ${category} में ${name} (${priceDisplay}, ${stockDisplay})।\n${reason || 'मजबूत इन्वेंट्री और स्वस्थ मार्जिन के साथ अधिकतम लाभ।'}`;
       case 'ta':
-        return `தற்போதைய சிறந்த வாய்ப்பு:
-• தயாரிப்பு: ${category} இல் உள்ள ${name}
-• விலை & இருப்பு: ${priceDisplay}, ${stockDisplay}
-• வணிக காரணம்: ${reason || 'இது அதிக வருவாய்க்காக வலுவான இருப்பு மற்றும் ஆரோக்கியமான லாபத்தை இணைக்கிறது.'}`;
+        return `சிறந்த வாய்ப்பு: ${category} இல் ${name} (${priceDisplay}, ${stockDisplay}).\n${reason || 'வலுவான இருப்பு மற்றும் ஆரோக்கியமான லாப வரம்பு.'}`;
       case 'te':
-        return `ప్రస్తుత ఉత్తమ అవకాశం:
-• ఉత్పత్తి: ${category} లోని ${name}
-• ధర & స్టాక్: ${priceDisplay}, ${stockDisplay}
-• వ్యూహాత్మక కారణం: ${reason || 'ఇది గరిష్ట రాబడి కోసం బలమైన ఇన్వెంటరీ మరియు ఆరోగ్యకరమైన మార్జిన్‌ను మిళితం చేస్తుంది.'}`;
+        return `ఉత్తమ అవకాశం: ${category} లో ${name} (${priceDisplay}, ${stockDisplay}).\n${reason || 'బలమైన ఇన్వెంటరీ మరియు ఆరోగ్యకరమైన మార్జిన్‌తో గరిష్ట రాబడి.'}`;
       default:
-        return `Top Recommended Opportunity:
-• Product: ${name} (${category})
-• Price & Stock: ${priceDisplay}, ${stockDisplay}
-• Strategic Value: ${reason || 'Combines strong inventory depth with healthy margins for maximum revenue velocity.'}`;
+        return `Top opportunity: ${name} (${category}) at ${priceDisplay}. ${stockDisplay}.\n${reason || 'Combines strong inventory depth with healthy margins.'}`;
     }
   },
   followUpReason: (name: string, stock: number | undefined, category: string, price: number | undefined, lang: string) => {
@@ -391,84 +361,44 @@ const LOCALIZED_MERCHANT_STRINGS = {
     const stockUnits = stock !== undefined ? `${stock} units` : 'healthy volume';
     switch (lang) {
       case 'kn':
-        return `${name} ಅನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಪ್ರಮುಖ ಅಂಶಗಳು:
-• ವರ್ಗ & ಬೆಲೆ: ${category}, ${formattedPrice}
-• ದಾಸ್ತಾನು ಲಭ್ಯತೆ: ${stockUnits} ಲಭ್ಯವಿದೆ (ಬಲವಾದ ದಾಸ್ತಾನು)
-• ಲಾಭದ ರಕ್ಷಣೆ: ಗ್ರಾಹಕರ ಬೇಡಿಕೆಯನ್ನು ಪೂರೈಸುವ ಜತೆಗೆ ಆರೋಗ್ಯಕರ ಲಾಭವನ್ನು ಖಚಿತಪಡಿಸುತ್ತದೆ.`;
+        return `${name} (${category}, ${formattedPrice}) ಶಿಫಾರಸು ಮಾಡಲು ಕಾರಣಗಳು:\n${stockUnits} ಲಭ್ಯವಿರುವ ದಾಸ್ತಾನು, ಬಲವಾದ ಬೇಡಿಕೆ ಮತ್ತು ಸುರಕ್ಷಿತ ಲಾಭದ ಮಾರ್ಜಿನ್.`;
       case 'hi':
-        return `${name} की सिफारिश के मुख्य कारण:
-• श्रेणी और मूल्य: ${category} पर ${formattedPrice}
-• इन्वेंटरी स्थिति: ${stockUnits} उपलब्ध (मजबूत स्टॉक स्तर)
-• लाभ मार्जिन: स्वस्थ लाभ मार्जिन बनाए रखते हुए ग्राहक मांग को कुशलतापूर्वक पूरा करता है।`;
+        return `${name} (${category}, ${formattedPrice}) की सिफारिश के कारण:\n${stockUnits} उपलब्ध स्टॉक, मजबूत ग्राहक मांग और सुरक्षित लाभ मार्जिन।`;
       case 'ta':
-        return `${name} பரிந்துரைக்கப்படுவதற்கான முக்கிய காரணங்கள்:
-• வகை & விலை: ${category}, ${formattedPrice}
-• இருப்பு நிலை: ${stockUnits} கையிருப்பில் உள்ளது
-• லாப பாதுகாப்பு: வாடிக்கையாளர் தேவையை பூர்த்தி செய்து உறுதியான லாபத்தை உறுதி செய்கிறது.`;
+        return `${name} (${category}, ${formattedPrice}) பரிந்துரைக்கான காரணங்கள்:\n${stockUnits} இருப்பு, நிலையான தேவை மற்றும் பாதுகாப்பான லாப வரம்பு.`;
       case 'te':
-        return `${name} సిఫార్సు చేయడానికి గల ముఖ్య కారణాలు:
-• వర్గం & ధర: ${category}, ${formattedPrice}
-• స్టాక్ లభ్యత: ${stockUnits} అందుబాటులో ఉన్నాయి
-• లాభ రక్షణ: డిమాండ్‌ను తీరుస్తూ మంచి లాభాలను నిర్ధారిస్తుంది.`;
+        return `${name} (${category}, ${formattedPrice}) సిఫార్సు చేయడానికి కారణాలు:\n${stockUnits} అందుబాటులో ఉన్న స్టాక్, బలమైన డిమాండ్ మరియు స్థిరమైన లాభాల మార్జిన్.`;
       default:
-        return `Key reasons to promote ${name}:
-• Category & Pricing: ${category} at ${formattedPrice}
-• Inventory Health: ${stockUnits} in stock (healthy inventory depth)
-• Margin & Demand: Captures customer demand while maintaining sound profit margins.`;
+        return `Reasons for ${name} (${category}, ${formattedPrice}):\n${stockUnits} in stock with strong demand velocity and stable profit margin.`;
     }
   },
   alternativeProduct: (name: string, category: string, priceDisplay: string, stockDisplay: string, lang: string) => {
     switch (lang) {
       case 'kn':
-        return `ಪರ್ಯಾಯ ಉತ್ಪನ್ನದ ವಿವರಗಳು:
-• ಉತ್ಪನ್ನ: ${category}ನಲ್ಲಿರುವ ${name}
-• ಬೆಲೆ & ದಾಸ್ತಾನು: ${priceDisplay}, ${stockDisplay}
-• ಪಾತ್ರ: ಈ ವರ್ಗದಲ್ಲಿ ಗ್ರಾಹಕರಿಗೆ ಸೂಕ್ತವಾದ ಆಯ್ಕೆಯಾಗಿದೆ.`;
+        return `ಪರ್ಯಾಯ ಉತ್ಪನ್ನ: ${category}ನಲ್ಲಿ ${name} (${priceDisplay}, ${stockDisplay}).\nಈ ವರ್ಗದ ಗ್ರಾಹಕರಿಗೆ ಸೂಕ್ತವಾದ ಆಯ್ಕೆ.`;
       case 'hi':
-        return `वैकल्पिक उत्पाद विवरण:
-• उत्पाद: ${category} में ${name}
-• मूल्य और स्टॉक: ${priceDisplay}, ${stockDisplay}
-• अवसर: इस श्रेणी में ब्राउज़ करने वाले ग्राहकों के लिए उपयुक्त विकल्प।`;
+        return `वैकल्पिक उत्पाद: ${category} में ${name} (${priceDisplay}, ${stockDisplay})।\nइस श्रेणी के ग्राहकों के लिए उपयुक्त विकल्प।`;
       case 'ta':
-        return `மாற்று தயாரிப்பு விவரம்:
-• தயாரிப்பு: ${category} இல் உள்ள ${name}
-• விலை & இருப்பு: ${priceDisplay}, ${stockDisplay}
-• வாய்ப்பு: வாடிக்கையாளர்களுக்கு சிறந்த மாற்றுத் தேர்வு.`;
+        return `மாற்று தயாரிப்பு: ${category} இல் ${name} (${priceDisplay}, ${stockDisplay}).\nஇந்த பிரிவின் வாடிக்கையாளர்களுக்கு சிறந்த தேர்வு.`;
       case 'te':
-        return `ప్రత్యామ్నాయ ఉత్పత్తి వివరాలు:
-• ఉత్పత్తి: ${category} లోని ${name}
-• ధర & స్టాక్: ${priceDisplay}, ${stockDisplay}
-• పాత్ర: ఈ కేటగిరీలో చూసే కస్టమర్ల కోసం అనుకూలమైన ప్రత్యామ్నాయం.`;
+        return `ప్రత్యామ్నాయ ఉత్పత్తి: ${category} లో ${name} (${priceDisplay}, ${stockDisplay}).\nఈ కేటగిరీ కస్టమర్ల కోసం అనుకూలమైన ప్రత్యామ్నాయం.`;
       default:
-        return `Alternative Catalog Product:
-• Product: ${name} in ${category}
-• Price & Stock: ${priceDisplay}, ${stockDisplay}
-• Role: Serves as a viable alternative for customers browsing this line.`;
+        return `Alternative: ${name} in ${category} (${priceDisplay}, ${stockDisplay}).\nViable alternative for customers browsing this line.`;
     }
   },
   categoryPromotion: (category: string, name: string, reason: string | undefined, lang: string) => {
     const defaultReason = reason || 'High stock with healthy margin';
     switch (lang) {
       case 'kn':
-        return `ನಿಮ್ಮ ${category} ಸಂಗ್ರಹಕ್ಕಾಗಿ ಪ್ರಚಾರದ ಶಿಫಾರಸು:
-• ಪ್ರಮುಖ ಉತ್ಪನ್ನ: ${name}
-• ಕಾರಣ: ${defaultReason}`;
+        return `${category} ಸಂಗ್ರಹದಲ್ಲಿ ${name} ಅನ್ನು ಪ್ರಚಾರ ಮಾಡಿ.\n${defaultReason}.`;
       case 'hi':
-        return `आपके ${category} संग्रह के लिए प्रचार सिफारिश:
-• प्रमुख उत्पाद: ${name}
-• रणनीतिक कारण: ${defaultReason}`;
+        return `${category} में ${name} को प्रमोट करें।\n${defaultReason}।`;
       case 'ta':
-        return `உங்கள் ${category} தொகுப்பிற்கான விளம்பர பரிந்துரை:
-• முதன்மை தயாரிப்பு: ${name}
-• முக்கிய காரணம்: ${defaultReason}`;
+        return `${category} பிரிவில் ${name} ஐ விளம்பரப்படுத்தவும்.\n${defaultReason}.`;
       case 'te':
-        return `మీ ${category} సేకరణ కోసం ప్రమోషన్ సిఫార్సు:
-• ప్రధాన ఉత్పత్తి: ${name}
-• వ్యూహాత్మక కారణం: ${defaultReason}`;
+        return `${category} సేకరణలో ${name} ను ప్రమోట్ చేయండి.\n${defaultReason}.`;
       default:
-        return `Recommended promotion for your ${category} collection:
-• Top Candidate: ${name}
-• Strategic Advantage: ${defaultReason}`;
+        return `Promote ${name} in ${category}.\n${defaultReason}.`;
     }
   }
 };
@@ -1398,15 +1328,15 @@ CRITICAL RULES:
 2. Target response language: ${targetLangName}. Respond fluently in ${targetLangName}.
 3. STRICT GROUNDING: NEVER translate or alter product names (e.g. 'Pro Carbon Running Shoes'), SKUs, exact numerical prices with ₹ symbol (e.g. '₹2,999'), or stock quantities. Keep them exactly as provided in the catalog facts.
 4. Maximum allowed promotion discount is 25%. Any higher discount must be rejected.
-5. POINT-WISE FORMAT & READABILITY MANDATE:
-   - DO NOT write dense, unbroken paragraphs.
-   - Present your answer using clear, point-wise bullet points (•) that are fast to scan and understand.
-   - Start with 1 short, direct summary line.
-   - Follow with 2 to 4 structured, easy-to-read bullet points containing ALL required details:
-     • **Product & Pricing**: Exact product name, current catalog price (₹), and current stock units.
-     • **Business Logic**: Why this recommendation works (inventory depth, margin safety, cash flow, or demand velocity).
-     • **Synergy / Action**: Suggested pairing (cross-sell or upsell item with exact name and price) or discount boundary (up to 25% max).
-   - Keep language plain, direct, and scannable without omitting any commercial details or numbers.
+5. 2–3 SHORT LINES MAXIMUM MANDATE:
+   - For simple merchant queries, keep answers strictly to 1–2 short lines (maximum 3 lines for complex comparisons).
+   - Direct and concise without filler, long paragraphs, or 4+ bullet points.
+   - Preserve only critical facts: exact product name, price (₹), stock, recommendation/reason, discount limit, or relevant cross-sell/upsell when necessary.
+   - Grounded reference patterns:
+     • "What should I promote?" → "Promote Pro Carbon Running Shoes (₹2,999). 15 in stock • Up to 15% safe discount."
+     • "What should I cross-sell?" → "Cross-sell Performance Compression Sports Socks (₹499) with Pro Carbon Running Shoes. Great complementary add-on."
+     • "Can I give a 20% discount?" → "Yes, 20% is within your 25% limit. Check margin before applying."
+     • "Can I give an 80% discount?" → "No. 80% exceeds your configured limit of 25%. Safe limit is up to 25%."
 6. When the merchant asks about another product or alternative ("What about the other shoe?", "What about the second one?"), answer the contextual product comparison directly using its actual catalog details and relationship. Do NOT invent any discount percentage or promotion recommendation unless explicitly requested.
 7. For follow-up questions, maintain context from previous turns.`;
 
@@ -1481,19 +1411,19 @@ Sub-Intent: ${subIntent || 'GENERAL'}`;
         responseText = LOCALIZED_MERCHANT_STRINGS.categoryPromotion(categoryOpportunity.category, categoryOpportunity.name, categoryOpportunity.reason, language);
       } else if (intent === 'CROSS_SELL_OPPORTUNITY' || subIntent === 'CROSS_SELL') {
         if (topCrossSell) {
-          responseText = `Recommended Cross-Sell Pairing:\n• Primary Product: ${topCrossSell.name}\n• Complementary Pairing: ${topCrossSell.relatedName}\n• Strategy: High-margin pairing boosts average order value (AOV) and moves inventory faster.`;
+          responseText = `Cross-sell ${topCrossSell.relatedName} with ${topCrossSell.name}.\nGreat complementary add-on to lift average order value.`;
         } else {
           responseText = `To enable cross-selling bundles, consider adding complementary accessories or related items to your catalog.`;
         }
       } else if (intent === 'UPSELL_OPPORTUNITY' || subIntent === 'UPSELL') {
         if (topUpsell) {
-          responseText = `Recommended Premium Upsell:\n• Base Product: ${topUpsell.name}\n• Premium Upgrade: ${topUpsell.premiumName} (+₹${topUpsell.priceDiff} difference)\n• Strategy: Gives customers a clear upgrade path, maximizing profit per order.`;
+          responseText = `Upgrade ${topUpsell.name} to ${topUpsell.premiumName} (+₹${topUpsell.priceDiff}).\nClear premium upgrade path maximizing profit per order.`;
         } else {
           responseText = `To maximize revenue through upselling, consider adding higher-tier premium options in your key categories.`;
         }
       } else if (intent === 'PRODUCT_PERFORMANCE') {
         if (topProduct) {
-          responseText = `${topProduct.name} is your top-performing product in ${topProduct.category} with ₹${topProduct.price} price point and ${topProduct.stock} available units.`;
+          responseText = `${topProduct.name} (${topProduct.category}) is your top performer at ₹${topProduct.price} with ${topProduct.stock} units in stock.`;
         } else {
           responseText = `Sales performance metrics will be available once customer orders are placed in your store.`;
         }

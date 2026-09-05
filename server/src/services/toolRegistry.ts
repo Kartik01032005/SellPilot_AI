@@ -764,7 +764,7 @@ const getCrossSellsTool: AgentTool<GetCrossSellsArgs, { crossSells: any[] }> = {
 
     const rec = await RecommendationService.getCrossSellRecommendation(pId);
     return {
-      crossSells: rec ? [rec] : [],
+      crossSells: Array.isArray(rec) ? rec : rec ? [rec] : [],
     };
   },
 };

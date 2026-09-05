@@ -155,37 +155,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </h4>
               </div>
 
-              {/* Recommended Upgrade (Upsell) */}
-              {recommendations.upsell && (
-                <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center space-x-1.5 text-indigo-700 font-bold text-xs">
-                      <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>{t('recommendations.upsellTitle')}</span>
+              {/* Premium Upgrade (Upsell) */}
+              {recommendations.upsell && (() => {
+                const upsellItem = Array.isArray(recommendations.upsell) ? recommendations.upsell[0] : recommendations.upsell;
+                if (!upsellItem) return null;
+                const upPrice = typeof upsellItem.price === 'number' ? upsellItem.price : (Number(upsellItem.price) || 0);
+                const priceDiff = typeof upsellItem.priceDiff === 'number' ? upsellItem.priceDiff : 0;
+                return (
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-1.5 text-indigo-700 font-bold text-xs">
+                        <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{t('recommendations.upsellTitle')}</span>
+                      </div>
+                      {priceDiff > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                          +₹{(priceDiff ?? 0).toLocaleString('en-IN')}
+                        </span>
+                      )}
                     </div>
-                    {recommendations.upsell.priceDiff > 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                        +₹{recommendations.upsell.priceDiff.toLocaleString('en-IN')}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-1 font-medium">{recommendations.upsell.reason}</p>
-                  <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-indigo-100">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">{recommendations.upsell.name}</span>
-                      <span className="text-xs font-black text-indigo-700">₹{recommendations.upsell.price.toLocaleString('en-IN')}</span>
+                    <p className="text-[11px] text-slate-600 mt-1 font-medium">{upsellItem.reason}</p>
+                    <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-indigo-100">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">{upsellItem.name}</span>
+                        <span className="text-xs font-black text-indigo-700">₹{(upPrice ?? 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddRecommendedItem(upsellItem)}
+                        className="px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center space-x-1 shadow-2xs transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>{t('recommendations.approveAndAdd')}</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleAddRecommendedItem(recommendations.upsell!)}
-                      className="px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center space-x-1 shadow-2xs transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>{t('recommendations.approveAndAdd')}</span>
-                    </button>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Frequently Paired Together (Cross-Sells) */}
               {recommendations.crossSells.length > 0 && (
@@ -195,28 +201,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <span>{t('recommendations.crossSellTitle')}</span>
                   </div>
                   <div className="space-y-2">
-                    {recommendations.crossSells.map((cs) => (
-                      <div
-                        key={cs.productId}
-                        className="p-2.5 rounded-xl bg-white/90 border border-emerald-100 flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs font-bold text-slate-900 truncate block">{cs.name}</span>
-                          <span className="text-[11px] text-slate-500 line-clamp-1 block">{cs.reason}</span>
-                          <span className="text-xs font-black text-emerald-700 block mt-0.5">
-                            ₹{cs.price.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAddRecommendedItem(cs)}
-                          className="shrink-0 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center space-x-1 shadow-2xs transition-colors"
+                    {(Array.isArray(recommendations.crossSells[0]) ? (recommendations.crossSells as any).flat() : recommendations.crossSells).map((rawCs: any) => {
+                      const cs = Array.isArray(rawCs) ? rawCs[0] : rawCs;
+                      if (!cs) return null;
+                      const csPrice = typeof cs.price === 'number' ? cs.price : (Number(cs.price) || 0);
+                      return (
+                        <div
+                          key={cs.productId || cs.name}
+                          className="p-2.5 rounded-xl bg-white/90 border border-emerald-100 flex items-center justify-between gap-2"
                         >
-                          <Plus className="w-3 h-3" />
-                          <span>{t('catalog.addToCart')}</span>
-                        </button>
-                      </div>
-                    ))}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-bold text-slate-900 truncate block">{cs.name}</span>
+                            <span className="text-[11px] text-slate-500 line-clamp-1 block">{cs.reason}</span>
+                            <span className="text-xs font-black text-emerald-700 block mt-0.5">
+                              ₹{(csPrice ?? 0).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddRecommendedItem(cs)}
+                            className="shrink-0 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center space-x-1 shadow-2xs transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>{t('catalog.addToCart')}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -228,7 +239,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">₹ {t('catalog.price')}</span>
               <span className="text-2xl font-black text-slate-900">
-                ₹{product.price.toLocaleString('en-IN')}
+                ₹{(product?.price ?? 0).toLocaleString('en-IN')}
               </span>
             </div>
             <div className="flex items-center space-x-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-full">
